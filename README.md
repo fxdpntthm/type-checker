@@ -9,4 +9,12 @@ way of type checking and is better than algorithm W in terms of its
 error message generation and performance as it detects errors before
 `algorithm W`
 
+Features to be implemented
+- [ ] algorithm w
+- [ ] algorithm m
+- [ ] experiment with bi-directional type checking
+- [ ] enrich the stlc with fix point combinator
+- [ ] Add richer types such as N-rank polymorphism
 
+I think this will slowly turn out to be some variation of
+TAPL written in Haskell
