@@ -12,11 +12,7 @@ import Data.Set (Set)
 -- All ids are Strings
 type Id = String
 
--- A unique id to identify a node in our syntax tree
-type TId = Int
-
 -- Simple expressions in our language based on lambda calculus
-
 data Exp = EVar Id                    -- "a", "b"
          | ELit Lit                   -- T/F
          | ELam Id Exp               -- \x. ..
@@ -115,11 +111,6 @@ instance Substitutable Scheme where
 --    It will be used in specializing type variables in our typechecking algorithm
 newtype Substitution = Subt (Map.Map Id Type)
   deriving (Show, Eq, Monoid)
-
--- instance Monoid Substitution where
---   mempty  = Subt Map.empty
---   mappend s1@(Subt m1) s2@(Subt m2) = Subt (m1 `Map.union` m')
---     where Subt m' = substitute s1 s2
 
 sub :: Id -> Type -> Substitution
 sub a t = Subt (Map.singleton a t)

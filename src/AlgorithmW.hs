@@ -77,7 +77,7 @@ generalize gamma ty = return $ Forall qs ty
 
 -- Typechecker state holds the substitutions that we would have to make
 -- in order to typecheck the term and a term number that will be used
--- to create fresh type variables
+-- to create unique fresh type variables.
 data TcState = TcState { subs :: Substitution
                        , tno  :: Int } deriving (Show, Eq)
 
@@ -98,7 +98,7 @@ instance Applicative TCM where
    (<*>) = liftM2 ($)
 
 instance Monad TCM where
-    return x = TCM (\s -> Right (x, s))
+    return a = TCM (\s -> Right (a, s))
     TCM sf >>= vf =
         TCM (\s0 -> case sf s0 of
                       Left s -> Left s
@@ -112,6 +112,7 @@ lookupVar (Context c) i = case (Map.lookup i c) of
   Just x -> return x
   Nothing -> typeError $ "Variable " ++ i ++ " not in scope"
 
+-- Generate unique type variable for a new term
 fresh :: Char -> TCM Type
 fresh c = TCM (\tcs -> do let tid = tno tcs
                           return ( TVar (c:'$':(suffixGen !! tid))
@@ -218,6 +219,6 @@ Let bindings introduce variable names into the context Γ.
 algoW gamma (ELet n e e') = do (ty, s) <- algoW gamma e                  -- Γ ⊢ e : T
                                let gamma' = substitute gamma s
                                sig <- generalize gamma' ty
-                               let gamma'' = updateContext gamma' n sig -- Γ, n: sig
+                               let gamma'' = updateContext gamma' n sig  -- Γ, n: sig
                                (ty', s') <- algoW gamma'' e'             -- Γ, x: sig ⊢ e' :T'
                                return (substitute ty' s', s')

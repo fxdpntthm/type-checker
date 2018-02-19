@@ -10,7 +10,7 @@ error message generation and performance as it detects errors before
 `algorithm W`
 
 Features to be implemented
-- [ ] algorithm w
+- [x] algorithm w
 - [ ] algorithm m
 - [ ] experiment with bi-directional type checking
 - [ ] enrich the stlc with fix point combinator
