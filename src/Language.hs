@@ -116,6 +116,11 @@ instance Substitutable Scheme where
 newtype Substitution = Subt (Map.Map Id Type)
   deriving (Show, Eq, Monoid)
 
+-- instance Monoid Substitution where
+--   mempty  = Subt Map.empty
+--   mappend s1@(Subt m1) s2@(Subt m2) = Subt (m1 `Map.union` m')
+--     where Subt m' = substitute s1 s2
+
 sub :: Id -> Type -> Substitution
 sub a t = Subt (Map.singleton a t)
 
@@ -131,7 +136,7 @@ instance (Substitutable a, Substitutable b) => Substitutable (a, b) where
 --  ==>  a ---> c holds
 instance Substitutable Substitution where
   substitute :: Substitution -> Substitution -> Substitution
-  substitute = mappend
+  substitute s (Subt m) = Subt (fmap (flip substitute s) m)
 
 data UnifyError = UnificationFailed String
   deriving (Show, Eq)

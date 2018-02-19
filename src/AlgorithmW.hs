@@ -21,6 +21,34 @@ import Debug.Trace (traceM)
 -- so that substitute t1 (unify (ty1, ty2)) = ty2 if unify returns a Right _
 -- we need to update the state i.e. subs tcm and return a ()
 unify :: Type ->  Type -> TCM ()
+unify t1@(TArr a b) t2@(TArr c d) = TCM (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
+                                                    (_, tcs') <- (runTCM $ unify a c) tcs
+                                                    -- traceM ("DEBUG (unify a c): " ++  show tcs')
+                                                    let s = subs tcs'
+                                                    (_, tcs'') <- (runTCM $ unify (substitute b s) (substitute d s)) tcs'
+                                                    -- traceM ("DEBUG (unify b d): " ++  show tcs'')
+                                                    return ((), tcs'')
+                                        )
+unify (TVar a) x@(TVar b)         | (a == b) = return ()
+                                  | otherwise =  TCM (\tcs ->
+                                                        return (()
+                                                               , tcs {subs = (subs tcs) `mappend` (sub a x)}))
+unify (TVar a) x          = do if (a `elem` fvs x)
+                               then typeError
+                                    $ "unification of "
+                                    ++ (show a) ++ " and " ++ (show x)
+                                    ++ " will lead to infinite type"
+                               else TCM (\tcs ->
+                                            return (()
+                                                   ,tcs {subs = (subs tcs) `mappend` (sub a x)}))
+unify x (TVar a)          = do if (a `elem` fvs x)
+                               then typeError
+                                    $ "unification of "
+                                    ++ (show a) ++ " and " ++ (show x)
+                                    ++ " will lead to infinite type"
+                               else TCM (\tcs ->
+                                            return (()
+                                                   ,tcs {subs = (subs tcs) `mappend` (sub a x)}))
 unify (TConst a) (TConst b) | (a == b)  = return ()
                             | otherwise = typeError
                                 $ "Cannot unify "
@@ -29,27 +57,8 @@ unify (TConst a)  b         = typeError
                              $ "Cannot unify " ++ (show a)
                                 ++ " with " ++ show b
 
-unify (TArr a b) (TArr c d) = TCM (\tcs -> do (_, tcs') <- (runTCM $ unify a c) tcs
-                                              (_, tcs'') <- (runTCM $ unify b d) tcs'
-                                              return ((), tcs'')
-                                  )
-unify (TVar a) (TVar b)     | (a == b)  = return ()
-                            | otherwise = TCM (\tcs ->
-                                                 return ((),
-                                                         TcState ((subs tcs) `mappend` (sub a (TVar b))) (tno tcs)))
-
-unify (TVar a) x            = do if (a `elem` fvs x)
-                                   then typeError
-                                              $ "unification will of "
-                                              ++ (show a) ++ " and " ++ (show x)
-                                              ++ " will lead to infinite type"
-                                   else TCM (\tcs ->
-                                                 return ((),
-                                                         TcState ((subs tcs) `mappend` (sub a x)) (tno tcs)))
-
 unify a b                   = typeError $ "Cannot unify "
                                 ++ (show a) ++ " and " ++ (show b)
-
 
 -- concretizes a scheme to specific type
 -- ie. takes all the quantified variables creates new type variables for them
@@ -59,9 +68,12 @@ instantiate (Forall q ty) = do q' <- mapM (const $ fresh 't') (Set.toList $ q)
                                let s = Subt (Map.fromList $ zip (Set.toList q) q')
                                return (substitute ty s)
 
--- TODO
+-- creates a scheme given a context and a type
+-- the free variables in the generated scheme
+-- are the free variables in the type - free variables in context
 generalize :: Context -> Type -> TCM Scheme
-generalize = undefined
+generalize gamma ty = return $ Forall qs ty
+  where qs = fvs ty `Set.difference` fvs gamma
 
 -- Typechecker state holds the substitutions that we would have to make
 -- in order to typecheck the term and a term number that will be used
@@ -109,7 +121,6 @@ fresh c = TCM (\tcs -> do let tid = tno tcs
           where
             suffixGen = liftA2 (\i -> \c -> [c] ++ show i)  [ 0 .. ]  ['a' .. 'z']
 
-
 -- Algorithm W should assign the most general type for the expression i.e.
 -- it should generate a Principal Type Scheme when
 -- given a context or should fail with an error
@@ -153,7 +164,7 @@ algoW gamma (EVar x) = do sig <- lookupVar gamma x              -- x : σ ϵ Γ
 
 {-
   This rule types lambda expression.
-      Γ, x:T ⊢ e :T'
+          Γ, x:T ⊢ e :T'
    -------------------------- [Lam]
        Γ ⊢ λx. e : T -> T'
 
@@ -170,20 +181,43 @@ algoW gamma (ELam x e) = do x' <- fresh 'x'                              -- x:T
 
 {-
    rule for application goes as follows:
-   if we have an expression 
+   if we have an expression e e'
+   then if the second expression e is well typed to T
+   and the first expression should be of the form T -> T'
+   then complete expression is of type T'
 
-      Γ ⊢ e' :T     Γ ⊢ e :T -> T'
+
+      Γ ⊢ e : T -> T'    Γ ⊢ e' :T
    --------------------------------------- [App]
                  Γ ⊢ e e' : T'
 
 
 -}
-algoW gamma (EApp e e') = do (ty, s)  <- algoW gamma e
-                             -- traceM ("ty " ++ show ty)
-                             (ty', s') <- algoW (substitute gamma s) e'
-                             -- traceM ("ty' " ++ show ty')
+algoW gamma (EApp e e') = do (ty, _)  <- algoW gamma e         -- Γ ⊢ e : T -> T'
+                             -- traceM ("e: " ++ show ty)
+                             (ty', _) <- algoW gamma e'        -- Γ ⊢ e' :T
+                             -- traceM ("e': " ++ show ty')
                              f <- fresh 'f'
-                             unify (substitute ty s') (TArr ty' f)
+                             unify ty (TArr ty' f)
                              s''' <- gets
-                             let fs = subs s'''
-                             return $ (substitute f fs, fs)
+                             let subst = subs s'''
+                             -- traceM ("e e': " ++ show f)
+                             return $ ((substitute f subst), subst)
+
+
+{-
+
+      Γ ⊢ e : T  sig = gen(Γ,T)  Γ, x: sig ⊢ e' :T'
+   ---------------------------------------------------[Let]
+         Γ ⊢ let x = e in e' : T'
+
+
+Let bindings introduce variable names into the context Γ.
+
+-}
+algoW gamma (ELet n e e') = do (ty, s) <- algoW gamma e                  -- Γ ⊢ e : T
+                               let gamma' = substitute gamma s
+                               sig <- generalize gamma' ty
+                               let gamma'' = updateContext gamma' n sig -- Γ, n: sig
+                               (ty', s') <- algoW gamma'' e'             -- Γ, x: sig ⊢ e' :T'
+                               return (substitute ty' s', s')
