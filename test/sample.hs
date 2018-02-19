@@ -23,12 +23,24 @@ sub1 = Subt (Map.singleton "a" (TVar "b"))
 sub2 :: Substitution
 sub2 = Subt (Map.singleton "b" (TVar "c"))
 
+
+
 main :: IO ()
 main = do
   putStrLn $ show $ substitute sub1 sub2
-  putStrLn $ show $ unify (TConst TBool) (TConst TBool)
-  putStrLn $ show $ unify (TConst TBool) (TArr (TVar "a") (TVar "b"))
-  putStrLn $ show $ unify (TVar "a") (TArr (TVar "a") (TVar "b"))
-  putStrLn $ show $ unify (TArr (TVar "a") (TVar "b"))
-    (TArr (TVar "a") (TVar "b"))
-  putStrLn $ show $ unify (TVar "a") (TArr (TVar "b") (TVar "c"))
+  putStrLn $ show $ (runTCM $ (unify (TConst TBool) (TConst TBool))) (TcState mempty 0)
+  putStrLn $ show $ (runTCM $ (unify (TConst TBool) (TArr (TVar "a") (TVar "b")))) (TcState mempty 0)
+  putStrLn $ show $ (runTCM $ (unify (TVar "a") (TArr (TVar "a") (TVar "b")))) (TcState mempty 0)
+  putStrLn $ show $ (runTCM $ (unify (TArr (TVar "a") (TVar "b"))
+    (TArr (TVar "a") (TVar "b")))) (TcState mempty 0)
+  putStrLn $ show $ (runTCM $ (unify (TVar "a") (TArr (TVar "b") (TVar "c")))) (TcState mempty 0)
+  putStrLn $ show $ (runTCM $ algoW (Context $ Map.singleton "y" (Forall (Set.fromList []) $ TConst TBool)) (EVar "x")) (TcState mempty 0)
+  putStrLn $ show $ (runTCM $ algoW (Context $ Map.singleton "x" (Forall (Set.fromList []) $ TConst TBool)) (EVar "x")) (TcState mempty 0)
+  putStrLn $ show $ (runTCM $ algoW (Context $ Map.empty) (ELam "x" (ELit $ LitB True))) (TcState mempty 0)
+  putStrLn $ show $ (runTCM $ algoW (Context $ Map.empty) (ELam "x" (ELam "y" $ ELit $ LitB True))) (TcState mempty 0)
+  putStrLn $ show $ (runTCM $ algoW (Context $ Map.empty)
+                     (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
+                    ) (TcState mempty 0)
+  putStrLn $ show $ (runTCM $ algoW (Context $ Map.empty)
+                     (EApp (EApp (ELam "x" (EVar "x")) (ELit $ LitB False)) (ELam "x" (EVar "x")))
+                    ) (TcState mempty 0)

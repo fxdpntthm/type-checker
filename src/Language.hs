@@ -17,37 +17,36 @@ type TId = Int
 
 -- Simple expressions in our language based on lambda calculus
 
-data Exp = EVar TId Id                    -- "a", "b"
-         | ELit TId Lit                   -- T/F
-         | ELam TId Id Exp               -- \x. ..
-         | EApp TId Exp Exp               -- e e'
-         | ELet TId Id Exp Exp           -- Let x = e in e'
+data Exp = EVar Id                    -- "a", "b"
+         | ELit Lit                   -- T/F
+         | ELam Id Exp               -- \x. ..
+         | EApp Exp Exp               -- e e'
+         | ELet Id Exp Exp           -- Let x = e in e'
          deriving (Show, Eq, Ord)
 
 data Lit = LitB Bool                  -- Literals for Bool
-         | LitInt Int                 -- Literals for Integer
+         | LitI Int                 -- Literals for Integer
          deriving (Show, Eq, Ord)
 
 -- Some simple Expressions in our language
 
 exp1 :: Exp
-exp1 = EVar 1 "a"        -- a
+exp1 = EVar "a"        -- a
 
-exp2 = ELam 2 "a" exp1  -- \ a. a
+exp2 = ELam "a" exp1  -- \ a. a
 
 litT = LitB True       -- True
 litF = LitB False      -- False
 
-lit0 = LitInt 0        -- 0
-lit1 = LitInt 1        -- 1
+lit0 = LitI 0        -- 0
+lit1 = LitI 1        -- 1
 
 -- \ x. (x True)
 expInvalid :: Exp
-expInvalid = ELam 1 "x" (EApp 2 (EVar 3 "x") (ELit 4 litT))
+expInvalid = ELam "x" (EApp (EVar "x") (ELit litT))
 
 -- Even though the above example is an expression it doesn't make sense
 -- Q: How can we ensure we accept only those expressions that make sense?
-
 -- A: Types to rescue
 
 -- Types themselves are a language and they have syntax and semantics of their own
@@ -92,6 +91,9 @@ instance Substitutable Type where
 data Scheme = Forall (Set Id) Type
   deriving (Show, Eq)
 
+scheme :: Type -> Scheme
+scheme t = Forall (Set.fromList []) t
+
 -- free type variables in a scheme are all the variables in the type
 -- that are not quantified
 -- > fvs (Forall (Set.singleton "a") (TArr (TVar "a") (TVar "b")))
@@ -135,7 +137,7 @@ data UnifyError = UnificationFailed String
   deriving (Show, Eq)
 
 -- Gamma, context that contains all the typing judgements
--- It is a collection of terms to their types
+-- It is a collection of terms to their type schemes
 -- gamma :: Context
 -- gamma = Map.fromList [ ("add",
 --                        Forall (Set.fromList ["a"])
