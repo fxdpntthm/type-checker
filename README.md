@@ -11,7 +11,7 @@ error message generation and performance as it detects errors before
 
 Features to be implemented
 - [x] algorithm w
-- [ ] algorithm m
+- [x] algorithm m
 - [ ] experiment with bi-directional type checking
 - [ ] enrich the stlc with fix point combinator
 - [ ] Add richer types such as N-rank polymorphism
