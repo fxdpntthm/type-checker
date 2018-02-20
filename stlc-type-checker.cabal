@@ -50,6 +50,7 @@ cabal-version:       >=2.0
 library
   -- Modules exported by the library.
   exposed-modules:     Language
+                     , Util
                      , AlgorithmW
                      , AlgorithmM
 

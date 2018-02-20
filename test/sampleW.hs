@@ -2,6 +2,7 @@ module Main where
 
 import Language
 import AlgorithmW
+import Util
 
 import Data.Map as Map
 import Data.Set as Set
