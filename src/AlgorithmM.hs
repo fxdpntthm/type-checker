@@ -15,7 +15,7 @@ module AlgorithmM where
 -- References:
 --     1. Proofs about a folklore let-polymorphic type inference algorithm
 --        https://dl.acm.org/citation.cfm?id=291892
---     2.
+
 
 import Language
 import Util
@@ -74,16 +74,59 @@ unify a b                   = typeError $ "Cannot unify "
 -- This algorithm takes in the context, expression and
 -- the expected type (or type constraint) of the expression and returns the
 -- substitution that satisfies the type constraint
+-- It is different from algoW:
+--    1. it does not return type and substitution.
+--    2. It expects a type to be given for which a substitution is returned.
+--    3. Unify is called at for Literal, Variable and Lambda (as opposed to Application call in algorithmW)
+
 algoM :: Context -> Exp -> Type -> TCM Substitution
 -- patten match on all the expression constructs
+
+
+{-
+   The first rule is for the literals,
+   literals have a constant type. eg. True: Bool 0: Int
+   and require no substitution
+
+  -------------------------------------------[Lit]
+               Γ ⊢ True : TBool
+
+  -------------------------------------------[Lit]
+               Γ ⊢ 3 : TInt
+
+  unify is called here so as to fix the type of the literal
+-}
 algoM gamma (ELit x) expty = case x of
   LitB _ -> unify (TConst TBool) expty
   LitI _ -> unify (TConst TInt) expty
 
+{-
+   The second rule is for the variable
+      x : σ ϵ Γ            τ = instantiate(σ)
+   -------------------------------------------[Var]
+               Γ ⊢ x : τ
+
+  search if the variable x exists in the context Γ and instantiate it.
+  returns a unification of expected type and instantiated type
+  or an error if no such variable exists.
+
+-}
 algoM gamma (EVar x) expty = do sig <- lookupVar gamma x   -- x : σ ϵ Γ
                                 tau <- instantiate sig     -- τ = inst(σ)
                                 unify tau expty            -- τ
 
+{-
+  This rule types lambda expression.
+          Γ, x:T ⊢ e :T'
+   -------------------------- [Lam]
+       Γ ⊢ λx. e : T -> T'
+
+  2 new fresh type variables are introduced, for x and e. They are unifed with
+  the expected type. The new type variable for x is used to extend the context
+  and the expression e is checked to return the final substition
+  with extended context with substituions applied.
+
+-}
 algoM gamma (ELam x e) expty = do b1 <- fresh 'x'
                                   b2 <- fresh 'e'
                                   s  <- unify (TArr b1 b2) expty
@@ -91,6 +134,24 @@ algoM gamma (ELam x e) expty = do b1 <- fresh 'x'
                                   s' <- algoM (substitute gamma' s) e (substitute b2 s)
                                   return (substitute s s')
 
+{-
+   rule for application goes as follows:
+   if we have an expression e e'
+   then if the second expression e is well typed to T
+   and the first expression should be of the form T -> T'
+   then complete expression is of type T'
+
+
+      Γ ⊢ e : T -> T'    Γ ⊢ e' :T
+   --------------------------------------- [App]
+                 Γ ⊢ e e' : T'
+
+
+  The interesting bit here is we have to introduce a new
+  type variable as the return type of the first expression.
+  Then e is checked against the TArr b expected type
+  to obtain a substitution for b. Then e' is checked for sanity
+-}
 algoM gamma (EApp e e') expty = do b <- fresh 'e'
                                    s <- algoM gamma e (TArr b expty)
                                    let gamma' = substitute gamma s
@@ -98,6 +159,19 @@ algoM gamma (EApp e e') expty = do b <- fresh 'e'
                                    s' <- algoM gamma' e' b'
                                    return (substitute s s')
 
+{-
+    Let bindings introduce variable names and associated types
+    into the context Γ.
+
+    The procedure for this rule is:
+    Obtain the type of e and bind it to x
+    then type check e' with the updated context
+
+       Γ ⊢ e : T    sig = gen(Γ,T)    Γ, x: sig ⊢ e' :T'
+   -------------------------------------------------------- [Let]
+                  Γ ⊢ let x = e in e' : T'
+
+-}
 algoM gamma (ELet x e e') expty = do b <- fresh 'e'
                                      s <- algoM gamma e b
                                      sig <- generalize gamma (substitute b s)
