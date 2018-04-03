@@ -178,3 +178,9 @@ algoM gamma (ELet x e e') expty = do b <- fresh 'e'
                                      let gamma' = updateContext gamma x sig
                                      s' <- algoM (substitute gamma' s) e' (substitute expty s)
                                      return (substitute s s')
+
+algoM gamma (EFix f'@(EVar f) l@(ELam x e)) expty = do b <- fresh 'f'
+                                                       let gamma' = updateContext gamma f (scheme b)
+                                                       algoM gamma' l expty
+
+algoM _ _ _ = typeError "Cannot typecheck current expression"

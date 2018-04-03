@@ -15,13 +15,14 @@ type Id = String
 -- Simple expressions in our language based on lambda calculus
 data Exp = EVar Id                    -- "a", "b"
          | ELit Lit                   -- T/F
-         | ELam Id Exp               -- \x. ..
+         | ELam Id Exp                -- \x. ..
          | EApp Exp Exp               -- e e'
-         | ELet Id Exp Exp           -- Let x = e in e'
+         | ELet Id Exp Exp            -- Let x = e in e'
+         | EFix Exp Exp              -- letrec f \x. e
          deriving (Show, Eq, Ord)
 
 data Lit = LitB Bool                  -- Literals for Bool
-         | LitI Int                 -- Literals for Integer
+         | LitI Int                   -- Literals for Integer
          deriving (Show, Eq, Ord)
 
 -- Some simple Expressions in our language
@@ -37,9 +38,9 @@ litF = LitB False      -- False
 lit0 = LitI 0        -- 0
 lit1 = LitI 1        -- 1
 
--- \ x. (x True)
+-- \ x. (True x)
 expInvalid :: Exp
-expInvalid = ELam "x" (EApp (EVar "x") (ELit litT))
+expInvalid = ELam "x" (EApp (ELit litT) (EVar "x"))
 
 -- Even though the above example is an expression it doesn't make sense
 -- Q: How can we ensure we accept only those expressions that make sense?
@@ -52,7 +53,7 @@ data Iota = TBool                     -- Types for Booleans
           | TInt                      -- Types for Literals 1, 2, 3
           deriving (Show, Eq)
 
--- Other concrete types
+-- Other types
 data Type = TVar Id                   -- Type variable
           | TArr Type Type            -- Arrow Type -> Type
           | TConst Iota               -- Concrete Type
@@ -83,12 +84,12 @@ instance Substitutable Type where
 
 -- Scheme has a universal quantifier for types
 -- Forall a, b, c TArr (TArr "a" "b") (TVar "c")
--- ∀ a,b,c (a -> b) -> c
+-- ∀ a,b,c. (a -> b) -> c
 data Scheme = Forall (Set Id) Type
   deriving (Show, Eq)
 
 scheme :: Type -> Scheme
-scheme t = Forall (Set.fromList []) t
+scheme t = Forall (Set.empty) t
 
 -- free type variables in a scheme are all the variables in the type
 -- that are not quantified

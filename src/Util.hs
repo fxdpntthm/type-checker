@@ -8,8 +8,7 @@ import Control.Monad (liftM2)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Set as Set
-import Data.Set (Set)
-
+import Data.Set (Set, (\\))
 
 
 -- Convinence function to return an error
@@ -21,7 +20,7 @@ typeError err = TCM (\_ ->  Left err)
 lookupVar :: Context -> Id -> TCM Scheme
 lookupVar (Context c) i = case (Map.lookup i c) of
   Just x -> return x
-  Nothing -> typeError $ "Variable " ++ i ++ " not in scope"
+  Nothing -> typeError $ "Variable " ++ i ++ " not in context"
 
 -- concretizes a scheme to specific type
 -- ie. takes all the quantified variables creates new type variables for them
@@ -33,10 +32,10 @@ instantiate (Forall q ty) = do q' <- mapM (const $ fresh 't') (Set.toList $ q)
 
 -- creates a scheme given a context and a type
 -- the free variables in the generated scheme
--- are the free variables in the type - free variables in context
+-- are the (free variables in the type) - (free variables in context)
 generalize :: Context -> Type -> TCM Scheme
 generalize gamma ty = return $ Forall qs ty
-  where qs = fvs ty `Set.difference` fvs gamma
+  where qs = fvs ty \\ fvs gamma
 
 -- Generate unique type variable for a new term
 fresh :: Char -> TCM Type
@@ -48,7 +47,7 @@ fresh c = TCM (\tcs -> do let tid = tno tcs
           where
             suffixGen = liftA2 (\i -> \c -> [c] ++ show i)  [ 0 .. ]  ['a' .. 'z']
 
--- Typechecker state holds the substitutions that we would have to make
+-- Typechecker state holds the substitutions that we would use
 -- in order to typecheck the term and a term number that will be used
 -- to create unique fresh type variables.
 data TcState = TcState { subs :: Substitution
