@@ -174,8 +174,8 @@ algoW gamma (EApp e e') = do (ty, s)  <- algoW gamma e         -- Γ ⊢ e : T -
     into the context Γ.
 
     The procedure for this rule is:
-    Obtain the type of e and bind it to x
-    then type check e' with the updated context
+    - Obtain the type of e and bind it to x
+    - then type check e' with the updated context
 
        Γ ⊢ e : T    sig = gen(Γ,T)    Γ, x: sig ⊢ e' :T'
    -------------------------------------------------------- [Let]
@@ -196,7 +196,7 @@ algoW gamma (EFix f'@(EVar f) l@(ELam x e)) = do b <- fresh 'f'                 
                                                  (ty, s) <- algoW gamma' l
                                                  unify (substitute b s) ty
                                                  tcst <- gets
-                                                 let s' = subs tcst 
+                                                 let s' = subs tcst
                                                  return (substitute ty s', s `mappend` s')
 
 algoW _ _  = typeError "Cannot infer type"
