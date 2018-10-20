@@ -49,10 +49,14 @@ cabal-version:       >=2.0
 
 library
   -- Modules exported by the library.
-  exposed-modules:     Language
-                     , Util
-                     , AlgorithmW
-                     , AlgorithmM
+  exposed-modules:     Stlc.Language
+                     , Stlc.Util
+                     , Stlc.AlgorithmW
+                     , Stlc.AlgorithmM
+                     -- , KStlc.LanguageK
+                     -- , KStlc.Util
+                     -- , KStlc.AlgorithmW
+                     -- , KStlc.AlgorithmM
 
   -- Modules included in this library but not exported.
   -- other-modules:       Language
@@ -61,7 +65,7 @@ library
   -- other-extensions:
 
   -- Other library packages from which modules are imported.
-  build-depends:       base >= 4.10 && < 4.11
+  build-depends:       base >= 4.10 && < 4.12
                      , containers >= 0.5 && < 0.6
                      , mtl >=2.2.1 && < 2.3
 
@@ -72,10 +76,10 @@ library
   default-language:    Haskell2010
 
 
-Test-Suite algo-w-test
+Test-Suite stlc-algo-w-test
   Type:                 exitcode-stdio-1.0
-  Main-is:              sampleW.hs
-  Build-depends:        base >= 4.10 && <= 4.11
+  Main-is:              Stlc/sampleW.hs
+  Build-depends:        base >= 4.10 && < 4.12
                       , containers >= 0.5 && < 0.6
                       , mtl >=2.2.1 && < 2.3
                       , stlc-type-checker
@@ -85,8 +89,8 @@ Test-Suite algo-w-test
 
 Test-Suite algo-m-test
   Type:                 exitcode-stdio-1.0
-  Main-is:              sampleM.hs
-  Build-depends:        base >= 4.10 && <= 4.11
+  Main-is:              Stlc/sampleM.hs
+  Build-depends:        base >= 4.10 && < 4.12
                       , containers >= 0.5 && < 0.6
                       , mtl >=2.2.1 && < 2.3
                       , stlc-type-checker

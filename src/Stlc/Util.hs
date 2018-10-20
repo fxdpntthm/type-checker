@@ -1,7 +1,7 @@
 {-# Language InstanceSigs #-}
-module Util where
+module Stlc.Util where
 
-import Language
+import Stlc.Language
 
 import Control.Applicative (liftA2)
 import Control.Monad (liftM2)

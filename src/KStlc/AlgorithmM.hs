@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
 
-module AlgorithmM where
+module KStlc.AlgorithmM where
 
 -- This is a context-sensitive top-down approach to type checking
 -- The pros are that:

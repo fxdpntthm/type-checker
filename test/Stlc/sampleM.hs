@@ -1,8 +1,8 @@
 module Main where
 
-import Language
-import AlgorithmM
-import Util
+import Stlc.Language
+import Stlc.AlgorithmM
+import Stlc.Util
 
 import Data.Map as Map
 import Data.Set as Set

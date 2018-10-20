@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE InstanceSigs #-}
 
-module AlgorithmW where
+module KStlc.AlgorithmW where
 
 -- This is a context-insensitive bottom-up approch to type checking
 -- The pros are:

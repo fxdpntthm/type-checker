@@ -1,7 +1,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Language where
+module Stlc.Language where
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
