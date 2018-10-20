@@ -111,7 +111,7 @@ instance Substitutable Scheme where
 --    It is a process of replacing type of one term with another type
 --    It will be used in specializing type variables in our typechecking algorithm
 newtype Substitution = Subt (Map.Map Id Type)
-  deriving (Show, Eq, Monoid)
+  deriving (Show, Eq, Semigroup, Monoid)
 
 sub :: Id -> Type -> Substitution
 sub a t = Subt (Map.singleton a t)
@@ -141,7 +141,7 @@ data UnifyError = UnificationFailed String
 --                        (TArr (TArr (TVar "a") (TVar "a")) (TVar "a")))
 --                      ]
 newtype Context =  Context (Map.Map Id Scheme)
-  deriving (Show, Eq, Monoid)
+  deriving (Show, Eq, Semigroup, Monoid)
 
 -- get all the free variables from the context
 -- this just goes over all the schemes and obtains the free variables from
