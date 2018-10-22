@@ -1,6 +1,6 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
+{-# LANGUAGE FlexibleInstances #-}
 module Stlc.Language where
 
 import qualified Data.Map as Map
@@ -15,10 +15,13 @@ type Id = String
 -- Simple expressions in our language based on lambda calculus
 data Exp = EVar Id                    -- "a", "b"
          | ELit Lit                   -- T/F
-         | ELam Id Exp                -- \x. ..
+         | ELamSp Id Exp            -- \x -* ...
+         | ELamSh Id Exp            -- \x ->> ...
          | EApp Exp Exp               -- e e'
-         | ELet Id Exp Exp            -- Let x = e in e'
-         | EFix Exp Exp              -- letrec f \x. e
+         -- | ELet Id Exp Exp            -- Let x = e in e'
+         -- For the time being becuase I do not want to mess around with polymorphism
+         -- | EFix Exp Exp              -- letrec f \x. e
+         -- and I do not want to mess with recursive functions (Though they should be seamless to add)
          deriving (Show, Eq, Ord)
 
 data Lit = LitB Bool                  -- Literals for Bool
@@ -30,7 +33,7 @@ data Lit = LitB Bool                  -- Literals for Bool
 exp1 :: Exp
 exp1 = EVar "a"        -- a
 
-exp2 = ELam "a" exp1  -- \ a. a
+exp2 = ELamSp "a" exp1  -- \ a. a
 
 litT = LitB True       -- True
 litF = LitB False      -- False
@@ -40,7 +43,7 @@ lit1 = LitI 1        -- 1
 
 -- \ x. (True x)
 expInvalid :: Exp
-expInvalid = ELam "x" (EApp (ELit litT) (EVar "x"))
+expInvalid = ELamSp "x" (EApp (ELit litT) (EVar "x"))
 
 -- Even though the above example is an expression it doesn't make sense
 -- Q: How can we ensure we accept only those expressions that make sense?
@@ -55,7 +58,8 @@ data Iota = TBool                     -- Types for Booleans
 
 -- Other types
 data Type = TVar Id                   -- Type variable
-          | TArr Type Type            -- Arrow Type -> Type
+          | TArrSp Type Type          -- Arrow Type ->> Type
+          | TArrSh Type Type          -- Arrow Type -* Type
           | TConst Iota               -- Concrete Type
           deriving (Show, Eq)
 
@@ -63,13 +67,14 @@ class FreeVariables a where
   fvs :: a -> Set Id
 
 -- free type variables in some concrete type
--- > fvs (TArr (TVar "a") (TVar "b"))
+-- > fvs (TArrSp (TVar "a") (TVar "b"))
 -- fvs (a -> b)
 -- fromList ["a","b"]
 instance FreeVariables Type where
   fvs :: Type -> Set Id
   fvs (TVar i)     = Set.singleton i
-  fvs (TArr t1 t2) = Set.union (fvs t1) (fvs t2)
+  fvs (TArrSp t1 t2) = Set.union (fvs t1) (fvs t2)
+  fvs (TArrSh t1 t2) = Set.union (fvs t1) (fvs t2)
   fvs (TConst _)   = Set.empty
 
 -- Substitution for types is described as follows:
@@ -79,11 +84,12 @@ instance FreeVariables Type where
 instance Substitutable Type where
   substitute :: Type -> Substitution -> Type
   substitute (TVar a)          (Subt m)     = Map.findWithDefault (TVar a) a m
-  substitute (TArr t1 t2)      s            = TArr (substitute t1 s) (substitute t2 s)
+  substitute (TArrSp t1 t2)      s            = TArrSp (substitute t1 s) (substitute t2 s)
+  substitute (TArrSh t1 t2)      s            = TArrSh (substitute t1 s) (substitute t2 s)
   substitute tcon@(TConst _)   _            = tcon
 
 -- Scheme has a universal quantifier for types
--- Forall a, b, c TArr (TArr "a" "b") (TVar "c")
+-- Forall a, b, c TArrSp (TArrSp "a" "b") (TVar "c")
 -- ∀ a,b,c. (a -> b) -> c
 data Scheme = Forall (Set Id) Type
   deriving (Show, Eq)
@@ -93,7 +99,7 @@ scheme t = Forall (Set.empty) t
 
 -- free type variables in a scheme are all the variables in the type
 -- that are not quantified
--- > fvs (Forall (Set.singleton "a") (TArr (TVar "a") (TVar "b")))
+-- > fvs (Forall (Set.singleton "a") (TArrSp (TVar "a") (TVar "b")))
 -- fvs (∀a. a -> b)
 -- fromList ["b"]
 instance FreeVariables Scheme where
@@ -134,13 +140,14 @@ data UnifyError = UnificationFailed String
   deriving (Show, Eq)
 
 -- Gamma, context that contains all the typing judgements
--- It is a collection of terms to their type schemes
+-- It is a mapping of ids to their type schemes and variables they are in sharing with
 -- gamma :: Context
 -- gamma = Map.fromList [ ("add",
 --                        Forall (Set.fromList ["a"])
---                        (TArr (TArr (TVar "a") (TVar "a")) (TVar "a")))
+--                        (TArrSp (TArrSp (TVar "a") (TVar "a")) (TVar "a"))
+--                        [c, d],)
 --                      ]
-newtype Context =  Context (Map.Map Id Scheme)
+newtype Context =  Context (Map.Map Id (Scheme, [Id]))
   deriving (Show, Eq, Semigroup, Monoid)
 
 -- get all the free variables from the context
@@ -148,13 +155,20 @@ newtype Context =  Context (Map.Map Id Scheme)
 -- each scheme and returns the union
 instance FreeVariables Context where
   fvs :: Context -> Set Id
-  fvs (Context m) = Set.unions (Map.elems $ Map.map fvs m)
+  fvs (Context m) = Set.unions (Map.elems $ Map.map (fvs . fst) m)
 
--- Substitute all the free variables in the context using the substitution
+-- substitution on the sharing information is id (only becuase I am lazy and do not want to
+-- deconstruct and re-construct the [id ---> (scheme, [ids])]
+instance Substitutable [Id] where
+  substitute :: [Id] -> Substitution -> [Id]
+  substitute ids _ = ids
+
+-- Substitute the free variables in the context using the substitution
 instance Substitutable Context where
   substitute :: Context -> Substitution -> Context
-  substitute (Context c) s = Context (flip (substitute) s <$> c)
+  substitute (Context c) s = Context (flip substitute s <$> c)
+
 
 -- extend the context by adding an (id, scheme) pair
-updateContext :: Context -> Id -> Scheme -> Context
-updateContext (Context gamma) e ty = Context (Map.insert e ty gamma)
+updateContext :: Context -> Id -> Scheme -> [Id] -> Context
+updateContext (Context gamma) e ty ids = Context (Map.insert e (ty, ids) gamma)
