@@ -43,14 +43,24 @@ import Debug.Trace (traceM)
 -- so that substitute t1 (unify (ty1, ty2)) = ty2 if unify returns a Right _
 -- we need to update the state i.e. subs tcm and return a ()
 unify :: Type ->  Type -> TCM ()
-unify t1@(TArr a b) t2@(TArr c d) = TCM (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
+unify t1@(TArrSp a b) t2@(TArrSp c d) = TCM (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
                                                     (_, tcs') <- (runTCM $ unify a c) tcs
                                                     -- traceM ("DEBUG (unify a c): " ++  show tcs')
                                                     let s = subs tcs'
-                                                    (_, tcs'') <- (runTCM $ unify (substitute b s) (substitute d s)) tcs'
+                                                    (_, tcs'') <- (runTCM $ unify (substitute s b) (substitute s d)) tcs'
                                                     -- traceM ("DEBUG (unify b d): " ++  show tcs'')
                                                     return ((), tcs'')
                                         )
+
+unify t1@(TArrSh a b) t2@(TArrSh c d) = TCM (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
+                                                    (_, tcs') <- (runTCM $ unify a c) tcs
+                                                    -- traceM ("DEBUG (unify a c): " ++  show tcs')
+                                                    let s = subs tcs'
+                                                    (_, tcs'') <- (runTCM $ unify (substitute s b) (substitute s d)) tcs'
+                                                    -- traceM ("DEBUG (unify b d): " ++  show tcs'')
+                                                    return ((), tcs'')
+                                        )
+
 unify (TVar a) x@(TVar b)         | (a == b) = return ()
                                   | otherwise =  TCM (\tcs ->
                                                         return (()
@@ -88,7 +98,7 @@ unify a b                   = typeError $ "Cannot unify "
 -- it should generate a Principal Type Scheme when
 -- given a context or should fail with an error
 algoW :: Context -> Exp -> TCM (Type, Substitution)
--- Our Exp can be of 5 types EVar, ELit, ELam, EApp, ELet
+-- Our Exp can be of 5 types EVar, ELit, ELamSp, EApp, ELet
 -- so we simply patten match on each constructor type and start assigning
 -- types
 {-
@@ -119,7 +129,7 @@ algoW gamma (ELit x) = do case x of
 
 -}
 
-algoW gamma (EVar x) = do sig <- lookupVar gamma x              -- x : σ ϵ Γ
+algoW gamma (EVar x) = do (sig, shinfo) <- lookupVar gamma x    -- x : σ ϵ Γ
                           tau <- instantiate sig                -- τ = inst(σ)
                           return (tau, mempty)                  -- τ
 
@@ -134,11 +144,18 @@ algoW gamma (EVar x) = do sig <- lookupVar gamma x              -- x : σ ϵ Γ
   its type and
 
 -}
-algoW gamma (ELam x e) = do x' <- fresh 'x'                             -- x:T
-                            let gamma' =                                -- Γ, x:T
-                                  updateContext gamma x (scheme x')
-                            (ty, s) <- algoW gamma' e                   -- e: T'
-                            return (TArr (substitute x' s) ty, s)        -- T -> T'
+algoW gamma (ELamSp x e) = do x' <- fresh 'x'                             -- x:T
+                              let gamma' =                                -- Γ, x:T
+                                   extendContext gamma x (scheme x') (Set.singleton x)
+                              (ty, s) <- algoW gamma' e                   -- e: T'
+                              return (TArrSp (substitute s x') ty, s)     -- T -> T'
+
+algoW gamma (ELamSh x e) = do x' <- fresh 'x'                             -- x:T
+                              let gamma' =                                -- Γ, x:T
+                                    extendContext gamma x (scheme x') (getvars gamma)
+                                   -- for each y /= x add x to y
+                              (ty, s) <- algoW gamma' e                   -- e: T'
+                              return (TArrSh (substitute s x') ty, s)     -- T -> T'
 
 {-
    rule for application goes as follows:
@@ -159,14 +176,14 @@ algoW gamma (ELam x e) = do x' <- fresh 'x'                             -- x:T
 -}
 algoW gamma (EApp e e') = do (ty, s)  <- algoW gamma e         -- Γ ⊢ e : T -> T'
                              -- traceM ("e: " ++ show ty)
-                             (ty', s') <- algoW (substitute gamma s) e'        -- Γ ⊢ e' :T
+                             (ty', s') <- algoW (substitute s gamma) e'        -- Γ ⊢ e' :T
                              -- traceM ("e': " ++ show ty')
                              f <- fresh 'f'
-                             unify (substitute ty s') (TArr ty' f)
+                             unify (substitute s' ty) (TArrSp ty' f)
                              s'' <- gets
                              let subst = subs s''
                              -- traceM ("e e': " ++ show f)
-                             return $ ((substitute f subst), (subst `mappend` s' `mappend` s))
+                             return $ ((substitute subst f), (subst `mappend` s' `mappend` s))
 
 
 {-
@@ -184,19 +201,21 @@ algoW gamma (EApp e e') = do (ty, s)  <- algoW gamma e         -- Γ ⊢ e : T -
 
 
 -}
-algoW gamma (ELet n e e') = do (ty, s) <- algoW gamma e                  -- Γ ⊢ e : T
-                               let gamma' = substitute gamma s
-                               sig <- generalize gamma' ty
-                               let gamma'' = updateContext gamma' n sig  -- Γ, n: sig
-                               (ty', s') <- algoW gamma'' e'             -- Γ, x: sig ⊢ e' :T'
-                               return (ty', s `mappend` s')
+-- FIXME for the time 
+-- algoW gamma (ELet n e e') = do (ty, s) <- algoW gamma e                  -- Γ ⊢ e : T
+--                                let gamma' = substitute gamma s
+--                                sig <- generalize gamma' ty
+--                                let gamma'' = updateContext gamma' n sig  -- Γ, n: sig
+--                                (ty', s') <- algoW gamma'' e'             -- Γ, x: sig ⊢ e' :T'
+--                                return (ty', s `mappend` s')
 
-algoW gamma (EFix f'@(EVar f) l@(ELam x e)) = do b <- fresh 'f'                                       --  new b
-                                                 let gamma' = updateContext gamma f (scheme b)        --  gamma, f:b
-                                                 (ty, s) <- algoW gamma' l
-                                                 unify (substitute b s) ty
-                                                 tcst <- gets
-                                                 let s' = subs tcst
-                                                 return (substitute ty s', s `mappend` s')
+-- FIXME for the time being
+-- algoW gamma (EFix f'@(EVar f) l@(ELamSp x e)) = do b <- fresh 'f'                                       --  new b
+--                                                  let gamma' = updateContext gamma f (scheme b)        --  gamma, f:b
+--                                                  (ty, s) <- algoW gamma' l
+--                                                  unify (substitute b s) ty
+--                                                  tcst <- gets
+--                                                  let s' = subs tcst
+--                                                  return (substitute ty s', s `mappend` s')
 
-algoW _ _  = typeError "Cannot infer type"
+-- algoW _ _  = typeError "Cannot infer type"

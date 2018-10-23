@@ -11,13 +11,16 @@ import qualified Data.Set as Set
 import Data.Set (Set, (\\))
 
 
+updateShInfo :: Context -> Id -> Context
+updateShInfo (Context c) newI = Context (Map.map (\(s, shinfo) -> (s, Set.insert newI shinfo)) c)
+
 -- Convinence function to return an error
 typeError :: String -> TCM a
 typeError err = TCM (\_ ->  Left err)
 
 -- Looks up a variable and returns the scheme if it exists in the
 -- context
-lookupVar :: Context -> Id -> TCM Scheme
+lookupVar :: Context -> Id -> TCM (Scheme, Set Id)
 lookupVar (Context c) i = case (Map.lookup i c) of
   Just x -> return x
   Nothing -> typeError $ "Variable " ++ i ++ " not in context"
@@ -28,7 +31,7 @@ lookupVar (Context c) i = case (Map.lookup i c) of
 instantiate :: Scheme -> TCM Type
 instantiate (Forall q ty) = do q' <- mapM (const $ fresh 't') (Set.toList $ q)
                                let s = Subt (Map.fromList $ zip (Set.toList q) q')
-                               return (substitute ty s)
+                               return (substitute s ty)
 
 -- creates a scheme given a context and a type
 -- the free variables in the generated scheme

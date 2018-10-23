@@ -12,6 +12,8 @@ import Data.Set (Set)
 -- All ids are Strings
 type Id = String
 
+type ShInfo = Set Id
+
 -- Simple expressions in our language based on lambda calculus
 data Exp = EVar Id                    -- "a", "b"
          | ELit Lit                   -- T/F
@@ -82,11 +84,11 @@ instance FreeVariables Type where
 -- if it is a function, apply subsitution to both sides of the arrow
 -- if it is const type, then we do not subtitute it with anything
 instance Substitutable Type where
-  substitute :: Type -> Substitution -> Type
-  substitute (TVar a)          (Subt m)     = Map.findWithDefault (TVar a) a m
-  substitute (TArrSp t1 t2)      s            = TArrSp (substitute t1 s) (substitute t2 s)
-  substitute (TArrSh t1 t2)      s            = TArrSh (substitute t1 s) (substitute t2 s)
-  substitute tcon@(TConst _)   _            = tcon
+  substitute :: Substitution -> Type -> Type
+  substitute (Subt m)     (TVar a)            = Map.findWithDefault (TVar a) a m
+  substitute s            (TArrSp t1 t2)      = TArrSp (substitute s t1) (substitute s t2)
+  substitute s            (TArrSh t1 t2)      = TArrSh (substitute s t1) (substitute s t2)
+  substitute _            tcon@(TConst _)     = tcon
 
 -- Scheme has a universal quantifier for types
 -- Forall a, b, c TArrSp (TArrSp "a" "b") (TVar "c")
@@ -108,9 +110,9 @@ instance FreeVariables Scheme where
 
 -- Substitue all the free variables in the type scheme with the substitution
 instance Substitutable Scheme where
-  substitute :: Scheme -> Substitution -> Scheme
-  substitute sm@(Forall is ty) (Subt s) =
-    Forall is (substitute ty (Subt (s `Map.restrictKeys` (fvs sm))))
+  substitute :: Substitution -> Scheme -> Scheme
+  substitute (Subt s) sm@(Forall is ty) =
+    Forall is (substitute (Subt (s `Map.restrictKeys` (fvs sm))) ty)
 
 -- Q: How should we describe the substitution?
 -- A: Substitution is nothing but a map from id to a type.
@@ -123,19 +125,20 @@ sub :: Id -> Type -> Substitution
 sub a t = Subt (Map.singleton a t)
 
 class Substitutable a where
-  substitute :: a -> Substitution -> a
+  substitute :: Substitution -> a -> a
 
 instance (Substitutable a, Substitutable b) => Substitutable (a, b) where
-  substitute :: (a, b) -> Substitution -> (a, b)
-  substitute (x, y) s = (substitute x s, substitute y s)
+  substitute :: Substitution -> (a, b) -> (a, b)
+  substitute s (x, y) = (substitute s x, substitute s y)
 
 -- This means subsitution is composable (obviously)
 -- if  a ---> b &&  b ---> c holds
 --  ==>  a ---> c holds
 instance Substitutable Substitution where
   substitute :: Substitution -> Substitution -> Substitution
-  substitute s (Subt m) = Subt (fmap (flip substitute s) m)
+  substitute s (Subt m) = Subt (fmap (substitute s) m)
 
+-- Thrown when a type cannot be unified in unification function
 data UnifyError = UnificationFailed String
   deriving (Show, Eq)
 
@@ -147,8 +150,11 @@ data UnifyError = UnificationFailed String
 --                        (TArrSp (TArrSp (TVar "a") (TVar "a")) (TVar "a"))
 --                        [c, d],)
 --                      ]
-newtype Context =  Context (Map.Map Id (Scheme, [Id]))
+newtype Context =  Context (Map.Map Id (Scheme, Set Id))
   deriving (Show, Eq, Semigroup, Monoid)
+
+getvars :: Context -> Set Id
+getvars (Context c) = Set.fromList $ Map.keys c
 
 -- get all the free variables from the context
 -- this just goes over all the schemes and obtains the free variables from
@@ -159,16 +165,16 @@ instance FreeVariables Context where
 
 -- substitution on the sharing information is id (only becuase I am lazy and do not want to
 -- deconstruct and re-construct the [id ---> (scheme, [ids])]
-instance Substitutable [Id] where
-  substitute :: [Id] -> Substitution -> [Id]
-  substitute ids _ = ids
+instance Substitutable ShInfo where
+  substitute :: Substitution -> ShInfo -> ShInfo
+  substitute _ ids = ids
 
 -- Substitute the free variables in the context using the substitution
 instance Substitutable Context where
-  substitute :: Context -> Substitution -> Context
-  substitute (Context c) s = Context (flip substitute s <$> c)
+  substitute :: Substitution -> Context -> Context
+  substitute s (Context c) = Context (substitute s <$> c)
 
 
 -- extend the context by adding an (id, scheme) pair
-updateContext :: Context -> Id -> Scheme -> [Id] -> Context
-updateContext (Context gamma) e ty ids = Context (Map.insert e (ty, ids) gamma)
+extendContext :: Context -> Id -> Scheme -> Set Id -> Context
+extendContext (Context gamma) e ty ids = Context (Map.insert e (ty, ids) gamma)

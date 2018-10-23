@@ -59,7 +59,9 @@ library
                      -- , KStlc.AlgorithmM
 
   -- Modules included in this library but not exported.
-  -- other-modules:       Language
+  -- other-modules:       Stlc.Language
+  --                    , Stlc.AlogorithmM
+  --                    , Stlc.Util
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:

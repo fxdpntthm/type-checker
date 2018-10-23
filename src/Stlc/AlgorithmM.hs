@@ -22,7 +22,10 @@ import Stlc.Util
 
 
 import qualified Data.Map as Map
+import qualified Data.Set as Set
+
 import Data.Map (Map)
+import Data.Set (Set)
 
 import Control.Monad (liftM2)
 
@@ -32,14 +35,24 @@ import Control.Monad (liftM2)
 -- so that substitute t1 (unify (ty1, ty2)) = ty2 if unify returns a Right _
 -- we need to update the state i.e. subs tcm and return a ()
 unify :: Type ->  Type -> TCM Substitution
-unify t1@(TArr a b) t2@(TArr c d) = TCM (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
+unify t1@(TArrSp a b) t2@(TArrSp c d) = TCM (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
                                                     (_, tcs') <- (runTCM $ unify a c) tcs
                                                     -- traceM ("DEBUG (unify a c): " ++  show tcs')
                                                     let s = subs tcs'
-                                                    (_, tcs'') <- (runTCM $ unify (substitute b s) (substitute d s)) tcs'
+                                                    (_, tcs'') <- (runTCM $ unify (substitute s b) (substitute s d)) tcs'
                                                     -- traceM ("DEBUG (unify b d): " ++  show tcs'')
                                                     return (subs tcs'', tcs'')
                                         )
+
+unify t1@(TArrSh a b) t2@(TArrSh c d) = TCM (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
+                                                    (_, tcs') <- (runTCM $ unify a c) tcs
+                                                    -- traceM ("DEBUG (unify a c): " ++  show tcs')
+                                                    let s = subs tcs'
+                                                    (_, tcs'') <- (runTCM $ unify (substitute s b) (substitute s d)) tcs'
+                                                    -- traceM ("DEBUG (unify b d): " ++  show tcs'')
+                                                    return (subs tcs'', tcs'')
+                                        )
+
 unify (TVar a) x@(TVar b)         | (a == b) = return (Subt Map.empty)
                                   | otherwise =  TCM (\tcs ->
                                                         return ((subs tcs) `mappend` (sub a x)
@@ -62,14 +75,13 @@ unify x (TVar a)          = do if (a `elem` fvs x)
                                                    , tcs { subs = (subs tcs) `mappend` (sub a x)}))
 unify (TConst a) (TConst b) | (a == b)  = return (Subt Map.empty)
                             | otherwise = typeError
-                                $ "Cannot unify "
-                                  ++ (show a) ++ " and " ++ (show b)
+                                    $ "Cannot unify " ++ (show a) ++ " and " ++ show b
+
 unify (TConst a)  b         = typeError
-                             $ "Cannot unify " ++ (show a)
-                                ++ " with " ++ show b
+                                $ "Cannot unify " ++ (show a) ++ " with " ++ show b
 
 unify a b                   = typeError $ "Cannot unify "
-                                ++ (show a) ++ " and " ++ (show b)
+                                ++ (show a) ++ " and " ++ show b
 
 -- This algorithm takes in the context, expression and
 -- the expected type (or type constraint) of the expression and returns the
@@ -111,9 +123,9 @@ algoM gamma (ELit x) expty = case x of
   or an error if no such variable exists.
 
 -}
-algoM gamma (EVar x) expty = do sig <- lookupVar gamma x   -- x : σ ϵ Γ
-                                tau <- instantiate sig     -- τ = inst(σ)
-                                unify tau expty            -- τ
+algoM gamma (EVar x) expty = do (sig, ids) <- lookupVar gamma x   -- x : σ ϵ Γ
+                                tau <- instantiate sig            -- τ = inst(σ)
+                                unify tau expty                   -- τ
 
 {-
   This rule types lambda expression.
@@ -127,12 +139,20 @@ algoM gamma (EVar x) expty = do sig <- lookupVar gamma x   -- x : σ ϵ Γ
   with extended context with substituions applied.
 
 -}
-algoM gamma (ELam x e) expty = do b1 <- fresh 'x'
-                                  b2 <- fresh 'e'
-                                  s  <- unify (TArr b1 b2) expty
-                                  let gamma' = updateContext gamma x (scheme b1)
-                                  s' <- algoM (substitute gamma' s) e (substitute b2 s)
-                                  return (substitute s s')
+algoM gamma (ELamSp x e) expty = do b1 <- fresh 'x'
+                                    b2 <- fresh 'e'
+                                    s  <- unify (TArrSp b1 b2) expty
+                                    let gamma' = extendContext gamma x (scheme b1) (Set.singleton x)
+                                    s' <- algoM (substitute s gamma') e (substitute s b2)
+                                    return (substitute s' s)
+
+algoM gamma (ELamSh x e) expty = do b1 <- fresh 'x'
+                                    b2 <- fresh 'e'
+                                    s  <- unify (TArrSh b1 b2) expty
+                                    let shinfo = getvars gamma
+                                    let gamma' = extendContext (updateShInfo gamma x) x (scheme b1) shinfo
+                                    s' <- algoM (substitute s gamma') e (substitute s b2)
+                                    return (substitute s' s)
 
 {-
    rule for application goes as follows:
@@ -149,15 +169,17 @@ algoM gamma (ELam x e) expty = do b1 <- fresh 'x'
 
   The interesting bit here is we have to introduce a new
   type variable as the return type of the first expression.
-  Then e is checked against the TArr b expected type
+  Then e is checked against the TArrSp b expected type
   to obtain a substitution for b. Then e' is checked for sanity
 -}
+
+-- FIX THIS
 algoM gamma (EApp e e') expty = do b <- fresh 'e'
-                                   s <- algoM gamma e (TArr b expty)
-                                   let gamma' = substitute gamma s
-                                   let b' = substitute b s
+                                   s <- algoM gamma e (TArrSp b expty)
+                                   let gamma' = substitute s gamma
+                                   let b' = substitute s b
                                    s' <- algoM gamma' e' b'
-                                   return (substitute s s')
+                                   return (substitute s' s)
 
 {-
     Let bindings introduce variable names and associated types
@@ -172,15 +194,18 @@ algoM gamma (EApp e e') expty = do b <- fresh 'e'
                   Γ ⊢ let x = e in e' : T'
 
 -}
-algoM gamma (ELet x e e') expty = do b <- fresh 'e'
-                                     s <- algoM gamma e b
-                                     sig <- generalize gamma (substitute b s)
-                                     let gamma' = updateContext gamma x sig
-                                     s' <- algoM (substitute gamma' s) e' (substitute expty s)
-                                     return (substitute s s')
 
-algoM gamma (EFix f'@(EVar f) l@(ELam x e)) expty = do b <- fresh 'f'
-                                                       let gamma' = updateContext gamma f (scheme b)
-                                                       algoM gamma' l expty
+-- FIXME
+-- algoM gamma (ELet x e e') expty = do b <- fresh 'e'
+--                                      s <- algoM gamma e b
+--                                      sig <- generalize gamma (substitute b s)
+--                                      let gamma' = updateContext gamma x sig
+--                                      s' <- algoM (substitute gamma' s) e' (substitute expty s)
+--                                      return (substitute s s')
+
+-- FIXME
+-- algoM gamma (EFix f'@(EVar f) l@(ELamSp x e)) expty = do b <- fresh 'f'
+--                                                        let gamma' = updateContext gamma f (scheme b)
+--                                                        algoM gamma' l expty
 
 algoM _ _ _ = typeError "Cannot typecheck current expression"
