@@ -1,4 +1,7 @@
-{-# Language InstanceSigs #-}
+{-# LANGUAGE InstanceSigs #-}
+-- {-# LANGUAGE DeriveFunctor #-}
+-- {-# LANGUAGE GeneralizedNewtypeDeriving#-}
+
 module Stlc.Util where
 
 import Stlc.Language
@@ -50,16 +53,30 @@ fresh c = TCM (\tcs -> do let tid = tno tcs
           where
             suffixGen = liftA2 (\i -> \c -> [c] ++ show i)  [ 0 .. ]  ['a' .. 'z']
 
+getUsed :: TCM (Set Id)
+getUsed = TCM (\tcs -> return $ (used tcs, tcs))
+
+updateUsed :: Id -> TCM ()
+updateUsed x = TCM (\tcs -> return ((), tcs {used = Set.insert x $ used tcs}))
+
+resetUsed :: Set Id -> TCM ()
+resetUsed ids = TCM (\tcs -> return ((), tcs {used = ids}))
+
 -- Typechecker state holds the substitutions that we would use
 -- in order to typecheck the term and a term number that will be used
 -- to create unique fresh type variables.
-data TcState = TcState { subs :: Substitution
-                       , tno  :: Int } deriving (Show, Eq)
+data TcState = TcState { subs :: Substitution       -- Current substitution
+                       , tno  :: Int                -- Term number for uniqueness (to generate fresh type variables)
+                       , used :: Set Id             -- The variables used
+                       } deriving (Show, Eq)
 
 newtype TCM a = TCM { runTCM :: TcState -> Either String (a, TcState) }
 
 gets :: TCM TcState
-gets = TCM (\s -> Right (s, s))
+gets = TCM (\s -> return (s, s))
+
+sets :: TcState -> TCM ()
+sets tcs = TCM (\s -> return ((), tcs))
 
 instance Functor TCM where
   fmap :: (a -> b) -> TCM a -> TCM b

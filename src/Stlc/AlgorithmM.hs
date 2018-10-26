@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Stlc.AlgorithmM where
 
@@ -28,7 +29,7 @@ import Data.Map (Map)
 import Data.Set (Set)
 
 import Control.Monad (liftM2)
-
+import Debug.Trace (traceM)
 
 -- Unify is a function that tries to unify 2 types or returns an error
 -- The goal will be to convert left Type into a right Type
@@ -109,8 +110,8 @@ algoM :: Context -> Exp -> Type -> TCM Substitution
   unify is called here so as to fix the type of the literal
 -}
 algoM gamma (ELit x) expty = case x of
-  LitB _ -> unify (TConst TBool) expty
-  LitI _ -> unify (TConst TInt) expty
+  LitB _ -> unify expty (TConst TBool)
+  LitI _ -> unify expty (TConst TInt)
 
 {-
    The second rule is for the variable
@@ -125,6 +126,7 @@ algoM gamma (ELit x) expty = case x of
 -}
 algoM gamma (EVar x) expty = do (sig, ids) <- lookupVar gamma x   -- x : σ ϵ Γ
                                 tau <- instantiate sig            -- τ = inst(σ)
+                                updateUsed x
                                 unify tau expty                   -- τ
 
 {-
@@ -174,13 +176,43 @@ algoM gamma (ELamSh x e) expty = do b1 <- fresh 'x'
 -}
 
 -- FIX THIS
-algoM gamma (EApp e e') expty = do b <- fresh 'e'
-                                   s <- algoM gamma e (TArrSp b expty)
-                                   let gamma' = substitute s gamma
-                                   let b' = substitute s b
-                                   s' <- algoM gamma' e' b'
-                                   return (substitute s' s)
+-- We have to split the gamma into 2 disjoint sets of e and e' to introduce TArrSp
+-- Or we have to show that we have complete overlap of gamma for e and e' to introduce TArrSh
+-- Else we fail
+algoM gamma (EApp e e') expty = do (original_state:: TcState) <- gets
+                                   b <- fresh 'e'
+                                   -- First assume that e e' are separate and get the used variables
+                                   traceM ("\tDEBUG: Checking for Separation")
+                                   let (orig_used::Set Id) = used original_state
+                                   s_sep <- algoM gamma e (TArrSp b expty)
+                                   (used_sep::Set Id) <- getUsed
 
+                                   let gamma' = substitute s_sep gamma
+                                   let b' = substitute s_sep b
+                                   resetUsed orig_used
+                                   sep_s' <- algoM gamma' e' b'
+                                   used_sep_e' <- getUsed
+                                   traceM ("\tDEBUG: " ++ (show used_sep) ++ " used in e")
+                                   traceM ("\tDEBUG: " ++ (show used_sep_e') ++ " used in e'")
+                                   -- check if the used variables are separate
+                                   if (used_sep_e' `Set.disjoint` used_sep)
+                                     then return (substitute sep_s' s_sep)
+                                     else
+                                     do traceM ("DEBUG: Checking for sharing")
+                                        sets original_state
+                                        -- now assume that e e' are shared and get the used variables
+                                        s_sh <- algoM gamma e (TArrSh b expty)
+                                        (used_sh::Set Id)  <- getUsed
+                                        -- Check if the used variables are in sharing
+                                        let gamma'' = substitute s_sh gamma
+                                        let b'' = substitute s_sh b
+                                        resetUsed used_sh
+                                        sh_s' <- algoM gamma'' e' b''
+                                        used_sh_e' <- getUsed
+                                        if used_sh == used_sh_e'
+                                          then return (substitute sh_s' s_sh)
+                                          else typeError "Could not prove sharing or separation"
+                                   -- return (substitute sep_s' s_sep)
 {-
     Let bindings introduce variable names and associated types
     into the context Γ.

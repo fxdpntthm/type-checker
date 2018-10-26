@@ -35,54 +35,95 @@ main = do
   putStrLn $ show $ substitute sub1 sub2
   putStrLn $ "Separating Pair:\n\t\t" ++ (show spPair)
   putStrLn $ "Sharing Pair:\n\t\t" ++ (show shPair)
-  -- putStr $ "+ should succeed:\n\t"
-  -- putStrLn $ show $ (runTCM $ (unify (TConst TBool) (TConst TBool))) (TcState mempty 0)
+
+  putStr $ "+ should succeed:\n\t"
+  putStrLn $ show $ (runTCM $ (unify (TConst TBool) (TConst TBool))) (TcState mempty 0 Set.empty)
+
   -- putStr $ "+ should fail:\n\t"
-  -- putStrLn $ show $ (runTCM $ (unify (TConst TBool) (TArrSp (TVar "a") (TVar "b")))) (TcState mempty 0)
+  -- putStrLn $ show $ (runTCM $ (unify (TConst TBool) (TArrSp (TVar "a") (TVar "b")))) (TcState mempty 0 Set.empty)
+
   -- putStr $ "+ should fail:\n\t"
-  -- putStrLn $ show $ (runTCM $ (unify (TVar "a") (TArrSp (TVar "a") (TVar "b")))) (TcState mempty 0)
+  -- putStrLn $ show $ (runTCM $ (unify (TVar "a") (TArrSp (TVar "a") (TVar "b")))) (TcState mempty 0 Set.empty)
+
   -- putStr $ "+ should succeed:\n\t"
   -- putStrLn $ show $ (runTCM $ (unify (TArrSp (TVar "a") (TVar "b"))
   --                                    (TArrSp (TVar "a") (TVar "b"))))
-  --                             (TcState mempty 0)
+  --                             (TcState mempty 0 Set.empty)
+
   -- putStr $ "+ should succeed:\n\t"
   -- putStrLn $ show $ (runTCM $ (unify (TVar "a")
   --                                    (TArrSp (TVar "b") (TVar "c"))))
-  --                           (TcState mempty 0)
+  --                           (TcState mempty 0 Set.empty)
+  putStr $ "+ Should succeed:\n"
+  putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
+                      (ELit $ LitB False)
+                     (TVar "a")
+                    ) (TcState mempty 0 Set.empty)
+  putStr $ "+ Should succeed:\n"
+  putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
+                      (ELit $ LitI 3)
+                     (TVar "a")
+                    ) (TcState mempty 0 Set.empty)
+
+  -- putStr $ "+ Should succeed:\n"
+  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
+  --                    (EApp (ELamSp "x" (EVar "x"))
+  --                                (ELit $ LitB False)
+  --                    )
+  --                   (TVar "a")
+  --                   ) (TcState mempty 0 Set.empty)
   -- putStr $ "+ should fail:\n\t"
-  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.singleton "y" (Forall (Set.fromList []) $ TConst TBool)) (EVar "x") (TVar "a"))
-  --                           (TcState mempty 0)
+  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.singleton "y" (Forall (Set.fromList []) $ TConst TBool, Set.empty)) (EVar "x") (TVar "a"))
+  --                           (TcState mempty 0 Set.empty)
+
   -- putStr $ "+ should succeed:\n\t"
-  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.singleton "x" (Forall (Set.fromList []) $ TConst TBool)) (EVar "x") (TVar "a"))
-  --                           (TcState mempty 0)
+  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.singleton "x" ((Forall (Set.fromList []) (TConst TBool)), Set.empty)) (EVar "x") (TVar "a"))
+  --                           (TcState mempty 0 Set.empty)
+
   -- putStr $ "+ should succeed:\n\t"
-  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty) (ELam "x" (ELit $ LitB True)) (TArrSp (TVar "a") (TConst TBool)))
-  --                           (TcState mempty 0)
+  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty) (ELamSp "x" (ELit $ LitB True)) (TArrSp (TVar "a") (TConst TBool)))
+  --                           (TcState mempty 0 Set.empty)
+
   -- putStr $ "+ should succeed:\n\t"
-  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty) (ELam "x" (ELit $ LitB True)) (TVar "a"))
-  --                           (TcState mempty 0)
+  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty) (ELamSp "x" (ELit $ LitB True)) (TVar "a"))
+  --                           (TcState mempty 0 Set.empty)
+
+
+  -- putStr $ "+ should succeed:\n"
+  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
+  --                                   (ELamSp "x" (ELamSp "y" $ ELit $ LitB True)) (TVar "a"))
+  --                           (TcState mempty 0 Set.empty)
+
+  -- putStr $ "+ should succeed:\n"
+  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
+  --                    (EApp (ELamSp "x" (EVar "x")) (ELit $ LitB False))  (TConst TBool)
+  --                   ) (TcState mempty 0 Set.empty)
+
+  -- putStr $ "+ should succeed:\n"
+  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
+  --                    (EApp (ELamSp "x" (EVar "x")) (ELamSp "y" (EVar "y")))
+  --                     (TArrSp (TVar "a") (TVar "a"))
+  --                   ) (TcState mempty 0 Set.empty)
+
+  putStr $ "+ should fail:\n"
+  putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
+                     (EApp (ELit $ LitB False)
+                       (ELamSp "y" (EVar "y")))
+                     (TVar "a")
+                    ) (TcState mempty 0 Set.empty)
+  putStr $ "+ Should fail:\n" -- FIXME!!
+  putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
+                     (EApp (EApp (ELamSp "x" (EVar "x"))
+                                 (ELit $ LitB False)
+                           )
+                           (ELamSp "y" (EVar "y"))
+                     )
+                    (TConst TBool)
+                    ) (TcState mempty 0 Set.empty)
+
   -- putStr $ "+ should succeed:\n\t"
   -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
-  --                                   (ELam "x" (ELam "y" $ ELit $ LitB True)) (TVar "a"))
-  --                           (TcState mempty 0)
-  -- putStr $ "+ should succeed:\n\t"
-  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
-  --                    (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))  (TVar "a")
-  --                   ) (TcState mempty 0)
-  -- putStr $ "+ should succeed:\n\t"
-  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
-  --                    (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
-  --                     (TVar "a")
-  --                   ) (TcState mempty 0)
-  -- putStr $ "+ should fail:\n\t"
-  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
-  --                    (EApp (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
-  --                          (ELam "x" (EVar "x")))
-  --                      (TConst TBool)
-  --                   ) (TcState mempty 0)
-  -- putStr $ "+ should succeed:\n\t"
-  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
-  --                    (ELet "id" (ELam "x" (EVar "x"))
+  --                    (ELet "id" (ELamSp "x" (EVar "x"))
   --                      (EApp (EVar "id") (ELit $ LitB False)))
   --                      (TVar "a")
   --                   ) (TcState mempty 0)
