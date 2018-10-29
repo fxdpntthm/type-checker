@@ -105,12 +105,12 @@ main = do
   --                     (TArrSp (TVar "a") (TVar "a"))
   --                   ) (TcState mempty 0 Set.empty)
 
-  putStr $ "+ should fail:\n"
-  putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
-                     (EApp (ELit $ LitB False)
-                       (ELamSp "y" (EVar "y")))
-                     (TVar "a")
-                    ) (TcState mempty 0 Set.empty)
+  -- putStr $ "+ should fail:\n"
+  -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
+  --                    (EApp (ELit $ LitB False)
+  --                      (ELamSp "y" (EVar "y")))
+  --                    (TVar "a")
+  --                   ) (TcState mempty 0 Set.empty)
   putStr $ "+ Should fail:\n" -- FIXME!!
   putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
                      (EApp (EApp (ELamSp "x" (EVar "x"))
@@ -118,9 +118,11 @@ main = do
                            )
                            (ELamSp "y" (EVar "y"))
                      )
-                    (TConst TBool)
+                    (TVar "a")
                     ) (TcState mempty 0 Set.empty)
 
+  putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty) shPair (TVar "a"))
+    (TcState mempty 0 Set.empty)
   -- putStr $ "+ should succeed:\n\t"
   -- putStrLn $ show $ (runTCM $ algoM (Context $ Map.empty)
   --                    (ELet "id" (ELamSp "x" (EVar "x"))

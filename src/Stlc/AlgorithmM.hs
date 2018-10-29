@@ -110,8 +110,8 @@ algoM :: Context -> Exp -> Type -> TCM Substitution
   unify is called here so as to fix the type of the literal
 -}
 algoM gamma (ELit x) expty = case x of
-  LitB _ -> unify expty (TConst TBool)
-  LitI _ -> unify expty (TConst TInt)
+  LitB _ -> unify (TConst TBool) expty
+  LitI _ -> unify (TConst TInt) expty
 
 {-
    The second rule is for the variable
