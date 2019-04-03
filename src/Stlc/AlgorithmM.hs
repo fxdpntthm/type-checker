@@ -240,4 +240,4 @@ algoM gamma (EApp e e') expty = do (original_state:: TcState) <- gets
 --                                                        let gamma' = updateContext gamma f (scheme b)
 --                                                        algoM gamma' l expty
 
-algoM _ _ _ = typeError "Cannot typecheck current expression"
+-- algoM _ _ _ = typeError "Cannot typecheck current expression"

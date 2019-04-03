@@ -136,7 +136,14 @@ instance (Substitutable a, Substitutable b) => Substitutable (a, b) where
 --  ==>  a ---> c holds
 instance Substitutable Substitution where
   substitute :: Substitution -> Substitution -> Substitution
-  substitute s (Subt m) = Subt (fmap (substitute s) m)
+  substitute s s'@(Subt m) = if consistent s s'
+                          then Subt (fmap (substitute s) m)
+                          else error $ "Error Unification failed for:\n" ++ show s ++ "\n" ++ show s' 
+
+
+consistent :: Substitution -> Substitution -> Bool
+consistent s1@(Subt m1) s2@(Subt m2) = all (\v -> Map.lookup v m1 == Map.lookup v m2) (vs::[Id]) -- shamelessly scraped from hyper efficient alb consistency check
+  where vs = Set.toList $ Set.intersection (Set.fromList $ Map.keys m1) (Set.fromList $ Map.keys m2)
 
 -- Thrown when a type cannot be unified in unification function
 data UnifyError = UnificationFailed String
