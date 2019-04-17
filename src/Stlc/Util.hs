@@ -45,7 +45,7 @@ fresh c = TCM (\tcs -> do let tid = tno tcs
                                  )
               )
           where
-            suffixGen = liftA2 (\i -> \c -> [c] ++ show i)  [ 0 .. ]  ['a' .. 'z']
+            suffixGen = liftA2 (\i -> \pre -> [pre] ++ show i)  [ (0::Integer) .. ]  ['a' .. 'z']
 
 -- Typechecker state holds the substitutions that we would use
 -- in order to typecheck the term and a term number that will be used
