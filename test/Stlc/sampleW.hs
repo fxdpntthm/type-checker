@@ -69,7 +69,6 @@ main = do
                      (EApp (ELamSp "x" (EVar "x")) (ELamSp "y" (EVar "y")))
                     ) (TcState mempty 0 Set.empty)
   putStrLn $ "+ should fail:\n\t -- () |- ((\\x. x) (False))(\\x.x)"
-  -- FIXME!!
   putStrLn $ show $ (runTCM $ algoW (Context $ Map.empty)
                      (EApp (EApp (ELamSp "x" (EVar "x")) (ELit $ LitB False))
                            (ELamSp "x" (EVar "x")))

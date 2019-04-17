@@ -137,7 +137,7 @@ algoW gamma (EVar x) = do (sig, shinfo) <- lookupVar gamma x    -- x : σ ϵ Γ
   This rule types lambda expression.
           Γ, x:T ⊢ e :T'
    -------------------------- [Lam]
-       Γ ⊢ λx. e : T -> T'
+       Γ ⊢ λ*x. e : T -* T'
 
   A new type variable is introduced that is bound to lambda and
   it is added on to the context Γ, the expression is then checked for
@@ -150,6 +150,18 @@ algoW gamma (ELamSp x e) = do x' <- fresh 'x'                             -- x:T
                               (ty, s) <- algoW gamma' e                   -- e: T'
                               return (TArrSp (substitute s x') ty, s)     -- T -> T'
 
+
+{-
+  This rule types lambda expression.
+          Γ, x:T ⊢ e :T'
+   -------------------------- [Lam]
+       Γ ⊢ λx. e : T -> T'
+
+  A new type variable is introduced that is bound to lambda and
+  it is added on to the context Γ, the expression is then checked for
+  its type and
+
+-}
 algoW gamma (ELamSh x e) = do x' <- fresh 'x'                             -- x:T
                               let gamma' =                                -- Γ, x:T
                                     extendContext gamma x (scheme x') (getvars gamma)
