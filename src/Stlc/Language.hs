@@ -135,7 +135,7 @@ instance Substitutable Substitution where
   substitute :: Substitution -> Substitution -> Substitution
   substitute s s'@(Subt m) = if consistent s s'
                              then Subt (fmap (flip substitute s) m)
-                             else error "substituion is not composable!" 
+                             else error $ "Substituion is not composable for:\n\t" ++ show s ++ "\n\t" ++ show s' 
 
 data UnifyError = UnificationFailed String
   deriving (Show, Eq)
