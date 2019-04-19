@@ -1,10 +1,11 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
+{-# LANGUAGE ScopedTypeVariables #-}
 module Stlc.Language where
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.List (all, intersect)
 import Data.Map (Map)
 import Data.Set (Set)
 
@@ -123,12 +124,18 @@ instance (Substitutable a, Substitutable b) => Substitutable (a, b) where
   substitute :: (a, b) -> Substitution -> (a, b)
   substitute (x, y) s = (substitute x s, substitute y s)
 
+consistent :: Substitution -> Substitution -> Bool
+consistent (Subt m1) (Subt m2) = all (\v -> Map.lookup v m1 == Map.lookup v m2) vs  -- hyper efficient?
+    where vs = intersect (Map.keys m1) (Map.keys m2)
+
 -- This means subsitution is composable (obviously)
 -- if  a ---> b &&  b ---> c holds
 --  ==>  a ---> c holds
 instance Substitutable Substitution where
   substitute :: Substitution -> Substitution -> Substitution
-  substitute s (Subt m) = Subt (fmap (flip substitute s) m)
+  substitute s s'@(Subt m) = if consistent s s'
+                             then Subt (fmap (flip substitute s) m)
+                             else error "substituion is not composable!" 
 
 data UnifyError = UnificationFailed String
   deriving (Show, Eq)

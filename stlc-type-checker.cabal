@@ -53,21 +53,17 @@ library
                      , Stlc.Util
                      , Stlc.AlgorithmW
                      , Stlc.AlgorithmM
-                     -- , KStlc.LanguageK
-                     -- , KStlc.Util
-                     -- , KStlc.AlgorithmW
-                     -- , KStlc.AlgorithmM
 
   -- Modules included in this library but not exported.
-  -- other-modules:       Language
+  -- other-modules:       
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
 
   -- Other library packages from which modules are imported.
-  build-depends:       base >= 4.10 && < 4.12
-                     , containers >= 0.5 && < 0.6
-                     , mtl >=2.2.1 && < 2.3
+  build-depends:       base ^>= 4.12
+                     , containers ^>= 0.6
+                     -- , mtl >=2.2.1 && < 2.3
 
   -- Directories containing source files.
   hs-source-dirs:      src
@@ -77,23 +73,23 @@ library
 
 
 Test-Suite stlc-algo-w-test
-  Type:                 exitcode-stdio-1.0
-  Main-is:              Stlc/sampleW.hs
-  Build-depends:        base >= 4.10 && < 4.12
-                      , containers >= 0.5 && < 0.6
-                      , mtl >=2.2.1 && < 2.3
-                      , stlc-type-checker
+  Type:                exitcode-stdio-1.0
+  Main-is:             Stlc/sampleW.hs
+  build-depends:       base ^>= 4.12
+                     , containers ^>= 0.6
+                     -- , mtl >=2.2.1 && < 2.3
+                     , stlc-type-checker
 
   hs-source-dirs:      test
   default-language:    Haskell2010
 
 Test-Suite algo-m-test
-  Type:                 exitcode-stdio-1.0
-  Main-is:              Stlc/sampleM.hs
-  Build-depends:        base >= 4.10 && < 4.12
-                      , containers >= 0.5 && < 0.6
-                      , mtl >=2.2.1 && < 2.3
-                      , stlc-type-checker
+  Type:                exitcode-stdio-1.0
+  Main-is:             Stlc/sampleM.hs
+  build-depends:       base ^>= 4.12
+                     , containers ^>= 0.6
+                     -- , mtl >=2.2.1 && < 2.3
+                     , stlc-type-checker
 
   hs-source-dirs:      test
   default-language:    Haskell2010
