@@ -61,7 +61,7 @@ unify (TVar a) x@(TVar b)         | (a == b) = return (Subt Map.empty)
 unify (TVar a) x          = do if (a `elem` fvs x)
                                then typeError
                                     $ "unification of "
-                                    ++ (show a) ++ " and " ++ (show x)
+                                    ++ (a) ++ " and " ++ (ppr x)
                                     ++ " will lead to infinite type"
                                else TCM (\tcs ->
                                             return ((subs tcs) `mappend` (sub a x)
@@ -69,20 +69,20 @@ unify (TVar a) x          = do if (a `elem` fvs x)
 unify x (TVar a)          = do if (a `elem` fvs x)
                                then typeError
                                     $ "unification of "
-                                    ++ (show a) ++ " and " ++ (show x)
+                                    ++ (a) ++ " and " ++ (ppr x)
                                     ++ " will lead to infinite type"
                                else TCM (\tcs ->
                                             return ((subs tcs) `mappend` (sub a x)
                                                    , tcs { subs = (subs tcs) `mappend` (sub a x)}))
 unify (TConst a) (TConst b) | (a == b)  = return (Subt Map.empty)
                             | otherwise = typeError
-                                    $ "Cannot unify " ++ (show a) ++ " and " ++ show b
+                                    $ "Cannot unify " ++ (ppr a) ++ " and " ++ ppr b
 
 unify (TConst a)  b         = typeError
-                                $ "Cannot unify " ++ (show a) ++ " with " ++ show b
+                                $ "Cannot unify " ++ (ppr a) ++ " with " ++ ppr b
 
 unify a b                   = typeError $ "Cannot unify "
-                                ++ (show a) ++ " and " ++ show b
+                                ++ (ppr a) ++ " and " ++ ppr b
 
 -- This algorithm takes in the context, expression and
 -- the expected type (or type constraint) of the expression and returns the
@@ -109,7 +109,7 @@ algoM :: Context -> Exp -> Type -> TCM Substitution
 
   unify is called here so as to fix the type of the literal
 -}
-algoM gamma (ELit x) expty = case x of
+algoM _ (ELit x) expty = case x of
   LitB _ -> unify (TConst TBool) expty
   LitI _ -> unify (TConst TInt) expty
 
@@ -124,7 +124,7 @@ algoM gamma (ELit x) expty = case x of
   or an error if no such variable exists.
 
 -}
-algoM gamma (EVar x) expty = do (sig, ids) <- lookupVar gamma x   -- x : σ ϵ Γ
+algoM gamma (EVar x) expty = do (sig, _) <- lookupVar gamma x     -- x : σ ϵ Γ
                                 tau <- instantiate sig            -- τ = inst(σ)
                                 updateUsed x
                                 unify tau expty                   -- τ

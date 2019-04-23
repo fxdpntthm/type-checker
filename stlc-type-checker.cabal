@@ -53,6 +53,7 @@ library
                      , Stlc.Util
                      , Stlc.AlgorithmW
                      , Stlc.AlgorithmM
+                     -- , Stlc.Printer
                      -- , KStlc.LanguageK
                      -- , KStlc.Util
                      -- , KStlc.AlgorithmW
@@ -78,7 +79,7 @@ library
   default-language:    Haskell2010
 
 
-Test-Suite stlc-algo-w-test
+Test-Suite algo-w-test
   Type:                 exitcode-stdio-1.0
   Main-is:              Stlc/sampleW.hs
   Build-depends:        base >= 4.11 && < 4.13

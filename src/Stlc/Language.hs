@@ -8,7 +8,6 @@ import qualified Data.Set as Set
 import Data.Map (Map)
 import Data.Set (Set)
 
-
 -- All ids are Strings
 type Id = String
 
@@ -32,20 +31,20 @@ data Lit = LitB Bool                  -- Literals for Bool
 
 -- Some simple Expressions in our language
 
-exp1 :: Exp
-exp1 = EVar "a"        -- a
+-- exp1 :: Exp
+-- exp1 = EVar "a"        -- a
 
-exp2 = ELamSp "a" exp1  -- \ a. a
+-- exp2 = ELamSp "a" exp1  -- \ a. a
 
-litT = LitB True       -- True
-litF = LitB False      -- False
+-- litT = LitB True       -- True
+-- litF = LitB False      -- False
 
-lit0 = LitI 0        -- 0
-lit1 = LitI 1        -- 1
+-- lit0 = LitI 0        -- 0
+-- lit1 = LitI 1        -- 1
 
 -- \ x. (True x)
-expInvalid :: Exp
-expInvalid = ELamSp "x" (EApp (ELit litT) (EVar "x"))
+-- expInvalid :: Exp
+-- expInvalid = ELamSp "x" (EApp (ELit litT) (EVar "x"))
 
 -- Even though the above example is an expression it doesn't make sense
 -- Q: How can we ensure we accept only those expressions that make sense?
@@ -138,11 +137,11 @@ instance Substitutable Substitution where
   substitute :: Substitution -> Substitution -> Substitution
   substitute s s'@(Subt m) = if consistent s s'
                           then Subt (fmap (substitute s) m)
-                          else error $ "Error Unification failed for:\n" ++ show s ++ "\n" ++ show s' 
+                          else error $ "Error Unification failed for:\n" ++ ppr s ++ "\n" ++ ppr s' 
 
-
+ -- shamelessly scraped from hyper efficient alb consistency check
 consistent :: Substitution -> Substitution -> Bool
-consistent s1@(Subt m1) s2@(Subt m2) = all (\v -> Map.lookup v m1 == Map.lookup v m2) (vs::[Id]) -- shamelessly scraped from hyper efficient alb consistency check
+consistent (Subt m1) (Subt m2) = all (\v -> Map.lookup v m1 == Map.lookup v m2) (vs::[Id])
   where vs = Set.toList $ Set.intersection (Set.fromList $ Map.keys m1) (Set.fromList $ Map.keys m2)
 
 -- Thrown when a type cannot be unified in unification function
@@ -185,3 +184,38 @@ instance Substitutable Context where
 -- extend the context by adding an (id, scheme) pair
 extendContext :: Context -> Id -> Scheme -> Set Id -> Context
 extendContext (Context gamma) e ty ids = Context (Map.insert e (ty, ids) gamma)
+
+
+
+class PP a where
+  ppr :: a -> String
+
+instance PP Lit where
+  ppr   (LitB b) = show b
+  ppr   (LitI i) = show i
+  
+
+instance PP Exp where
+  ppr (EVar i) = i
+
+  ppr (ELit l) = ppr l
+
+  ppr (ELamSp i e) = "λ" ++ i ++ ". " ++ ppr e
+  ppr (ELamSh i e) = "α" ++ i ++ ". " ++ ppr e
+  ppr (EApp e1 e2)   = "(" ++ ppr e1 ++ ") (" ++ ppr e2 ++  ")"
+
+
+instance PP Iota where
+  ppr TBool =  "Bool"
+  ppr TInt  = "Int"
+
+instance PP Type where
+  ppr (TVar i) = i
+  ppr (TArrSp t1 t2) = "(" ++ ppr t1 ++ ") -*> (" ++ ppr t2 ++ ")"
+  ppr (TArrSh t1 t2) = "(" ++ ppr t1 ++ ") ->> (" ++ ppr t2 ++ ")"
+  ppr (TConst iota) = ppr iota
+
+instance PP Substitution where
+  ppr (Subt m) = "Subst [ "
+                 ++ concat (fmap (\(i, ty) -> "(" ++ show i ++ ", " ++ ppr ty ++ ")" ) (Map.toList m))
+                 ++ " ]"  
