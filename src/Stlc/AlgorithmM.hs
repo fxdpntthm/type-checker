@@ -25,23 +25,23 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 
 import Control.Monad (liftM2)
-
+import Control.Monad.State
 
 -- Unify is a function that tries to unify 2 types or returns an error
 -- The goal will be to convert left Type into a right Type
 -- so that substitute t1 (unify (ty1, ty2)) = ty2 if unify returns a Right _
 -- we need to update the state i.e. subs tcm and return a ()
 unify :: Type ->  Type -> TCM Substitution
-unify t1@(TArr a b) t2@(TArr c d) = TCM (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
-                                                    (_, tcs') <- (runTCM $ unify a c) tcs
+unify t1@(TArr a b) t2@(TArr c d) = StateT (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
+                                                    tcs' <- (execStateT $ unify a c) tcs
                                                     -- traceM ("DEBUG (unify a c): " ++  show tcs')
                                                     let s = subs tcs'
-                                                    (_, tcs'') <- (runTCM $ unify (substitute b s) (substitute d s)) tcs'
+                                                    tcs'' <- (execStateT $ unify (substitute b s) (substitute d s)) tcs'
                                                     -- traceM ("DEBUG (unify b d): " ++  show tcs'')
                                                     return (subs tcs'', tcs'')
                                         )
 unify (TVar a) x@(TVar b)         | (a == b) = return (Subt Map.empty)
-                                  | otherwise =  TCM (\tcs ->
+                                  | otherwise =  StateT (\tcs ->
                                                         return ((subs tcs) `mappend` (sub a x)
                                                                ,tcs {subs = (subs tcs) `mappend` (sub a x)}))
 unify (TVar a) x          = do if (a `elem` fvs x)
@@ -49,7 +49,7 @@ unify (TVar a) x          = do if (a `elem` fvs x)
                                     $ "unification of "
                                     ++ (show a) ++ " and " ++ (show x)
                                     ++ " will lead to infinite type"
-                               else TCM (\tcs ->
+                               else StateT (\tcs ->
                                             return ((subs tcs) `mappend` (sub a x)
                                                    , tcs { subs = (subs tcs) `mappend` (sub a x)}))
 unify x (TVar a)          = do if (a `elem` fvs x)
@@ -57,7 +57,7 @@ unify x (TVar a)          = do if (a `elem` fvs x)
                                     $ "unification of "
                                     ++ (show a) ++ " and " ++ (show x)
                                     ++ " will lead to infinite type"
-                               else TCM (\tcs ->
+                               else StateT (\tcs ->
                                             return ((subs tcs) `mappend` (sub a x)
                                                    , tcs { subs = (subs tcs) `mappend` (sub a x)}))
 unify (TConst a) (TConst b) | (a == b)  = return (Subt Map.empty)

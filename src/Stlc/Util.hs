@@ -5,6 +5,7 @@ import Stlc.Language
 
 import Control.Applicative (liftA2)
 import Control.Monad (liftM2)
+import Control.Monad.State
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Set as Set
@@ -13,7 +14,7 @@ import Data.Set (Set, (\\))
 
 -- Convinence function to return an error
 typeError :: String -> TCM a
-typeError err = TCM (\_ ->  Left err)
+typeError err = StateT (\_ ->  Left err)
 
 -- Looks up a variable and returns the scheme if it exists in the
 -- context
@@ -39,13 +40,10 @@ generalize gamma ty = return $ Forall qs ty
 
 -- Generate unique type variable for a new term
 fresh :: Char -> TCM Type
-fresh c = TCM (\tcs -> do let tid = tno tcs
-                          return ( TVar (c:'$':(suffixGen !! tid))
-                                 , tcs {tno = tid + 1}
-                                 )
-              )
-          where
-            suffixGen = liftA2 (\i -> \pre -> [pre] ++ show i)  [ (0::Integer) .. ]  ['a' .. 'z']
+fresh c = StateT (\(TcState s i) -> return (TVar (c:'`':(suffixGen !! i))
+                                           , TcState s (i + 1)))
+  where
+    suffixGen = liftA2 (\i -> \pre -> [pre] ++ show i)  [ (1::Integer) .. ]  ['a' .. 'z']
 
 -- Typechecker state holds the substitutions that we would use
 -- in order to typecheck the term and a term number that will be used
@@ -53,23 +51,4 @@ fresh c = TCM (\tcs -> do let tid = tno tcs
 data TcState = TcState { subs :: Substitution
                        , tno  :: Int } deriving (Show, Eq)
 
-newtype TCM a = TCM { runTCM :: TcState -> Either String (a, TcState) }
-
-gets :: TCM TcState
-gets = TCM (\s -> Right (s, s))
-
-instance Functor TCM where
-  fmap :: (a -> b) -> TCM a -> TCM b
-  fmap f tcm = TCM (\s -> do (r, s') <- runTCM tcm s
-                             return ((f r), s'))
-
-instance Applicative TCM where
-   pure = return
-   (<*>) = liftM2 ($)
-
-instance Monad TCM where
-    return a = TCM (\s -> Right (a, s))
-    TCM sf >>= vf =
-        TCM (\s0 -> case sf s0 of
-                      Left s -> Left s
-                      Right (v, s1) -> runTCM (vf v) s1)
+type TCM a = StateT TcState  (Either String) a

@@ -31,6 +31,7 @@ import Stlc.Util
 
 import Control.Applicative (liftA2)
 import Control.Monad (liftM2)
+import Control.Monad.State
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Set as Set
@@ -43,16 +44,16 @@ import Debug.Trace (traceM)
 -- so that substitute t1 (unify (ty1, ty2)) = ty2 if unify returns a Right _
 -- we need to update the state i.e. subs tcm and return a ()
 unify :: Type ->  Type -> TCM ()
-unify t1@(TArr a b) t2@(TArr c d) = TCM (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
-                                                    (_, tcs') <- (runTCM $ unify a c) tcs
+unify t1@(TArr a b) t2@(TArr c d) = StateT (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
+                                                    tcs' <- (execStateT $ unify a c) tcs
                                                     -- traceM ("DEBUG (unify a c): " ++  show tcs')
                                                     let s = subs tcs'
-                                                    (_, tcs'') <- (runTCM $ unify (substitute b s) (substitute d s)) tcs'
+                                                    tcs'' <- (execStateT $ unify (substitute b s) (substitute d s)) tcs'
                                                     -- traceM ("DEBUG (unify b d): " ++  show tcs'')
                                                     return ((), tcs'')
                                         )
 unify (TVar a) x@(TVar b)         | (a == b) = return ()
-                                  | otherwise =  TCM (\tcs ->
+                                  | otherwise =  StateT (\tcs ->
                                                         return (()
                                                                , tcs {subs = (subs tcs) `mappend` (sub a x)}))
 unify (TVar a) x          = do if (a `elem` fvs x)
@@ -60,7 +61,7 @@ unify (TVar a) x          = do if (a `elem` fvs x)
                                     $ "unification of "
                                     ++ (show a) ++ " and " ++ (show x)
                                     ++ " will lead to infinite type"
-                               else TCM (\tcs ->
+                               else StateT (\tcs ->
                                             return (()
                                                    ,tcs {subs = (subs tcs) `mappend` (sub a x)}))
 unify x (TVar a)          = do if (a `elem` fvs x)
@@ -68,7 +69,7 @@ unify x (TVar a)          = do if (a `elem` fvs x)
                                     $ "unification of "
                                     ++ (show a) ++ " and " ++ (show x)
                                     ++ " will lead to infinite type"
-                               else TCM (\tcs ->
+                               else StateT (\tcs ->
                                             return (()
                                                    ,tcs {subs = (subs tcs) `mappend` (sub a x)}))
 unify (TConst a) (TConst b) | (a == b)  = return ()
@@ -163,7 +164,7 @@ algoW gamma (EApp e e') = do (ty, s)  <- algoW gamma e         -- Γ ⊢ e : T -
                              -- traceM ("e': " ++ show ty')
                              f <- fresh 'f'
                              unify (substitute ty s') (TArr ty' f)
-                             s'' <- gets
+                             s'' <- get
                              let subst = subs s''
                              -- traceM ("e e': " ++ show f)
                              return $ ((substitute f subst), (subst `mappend` s' `mappend` s))
@@ -195,7 +196,7 @@ algoW gamma (EFix f'@(EVar f) l@(ELam x e)) = do b <- fresh 'f'                 
                                                  let gamma' = updateContext gamma f (scheme b)        --  gamma, f:b
                                                  (ty, s) <- algoW gamma' l
                                                  unify (substitute b s) ty
-                                                 tcst <- gets
+                                                 tcst <- get
                                                  let s' = subs tcst
                                                  return (substitute ty s', s `mappend` s')
 

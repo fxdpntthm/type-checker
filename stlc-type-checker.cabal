@@ -63,7 +63,7 @@ library
   -- Other library packages from which modules are imported.
   build-depends:       base ^>= 4.12
                      , containers ^>= 0.6
-                     -- , mtl >=2.2.1 && < 2.3
+                     , mtl >=2.2.1 && < 2.3
 
   -- Directories containing source files.
   hs-source-dirs:      src
@@ -77,7 +77,7 @@ Test-Suite stlc-algo-w-test
   Main-is:             Stlc/sampleW.hs
   build-depends:       base ^>= 4.12
                      , containers ^>= 0.6
-                     -- , mtl >=2.2.1 && < 2.3
+                     , mtl >=2.2.1 && < 2.3
                      , stlc-type-checker
 
   hs-source-dirs:      test
@@ -88,7 +88,7 @@ Test-Suite algo-m-test
   Main-is:             Stlc/sampleM.hs
   build-depends:       base ^>= 4.12
                      , containers ^>= 0.6
-                     -- , mtl >=2.2.1 && < 2.3
+                     , mtl >=2.2.1 && < 2.3
                      , stlc-type-checker
 
   hs-source-dirs:      test
