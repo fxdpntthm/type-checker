@@ -115,7 +115,7 @@ newtype Substitution = Subt (Map.Map Id Type)
   deriving (Show, Eq, Semigroup, Monoid)
 
 sub :: Id -> Type -> Substitution
-sub a t = Subt (Map.singleton a t)
+sub a t = Subt (Map.singleton a t, Map.empty)
 
 class Substitutable a where
   substitute :: a -> Substitution -> a

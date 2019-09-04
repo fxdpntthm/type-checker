@@ -26,11 +26,13 @@ module KStlc.AlgorithmW where
 -- 4. Proofs about a folklore let-polymorphic type inference algorithm
 --    https://dl.acm.org/citation.cfm?id=291892
 
-import Language
-import Util
+import KStlc.LanguageK
+import KStlc.Util
 
 import Control.Applicative (liftA2)
 import Control.Monad (liftM2)
+import Control.Monad.State
+
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Set as Set
@@ -38,48 +40,72 @@ import Data.Set (Set)
 
 import Debug.Trace (traceM)
 
--- Unify is a function that tries to unify 2 types or returns an error
--- The goal will be to convert left Type into a right Type
--- so that substitute t1 (unify (ty1, ty2)) = ty2 if unify returns a Right _
--- we need to update the state i.e. subs tcm and return a ()
-unify :: Type ->  Type -> TCM ()
-unify t1@(TArr a b) t2@(TArr c d) = TCM (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
-                                                    (_, tcs') <- (runTCM $ unify a c) tcs
-                                                    -- traceM ("DEBUG (unify a c): " ++  show tcs')
-                                                    let s = subs tcs'
-                                                    (_, tcs'') <- (runTCM $ unify (substitute b s) (substitute d s)) tcs'
-                                                    -- traceM ("DEBUG (unify b d): " ++  show tcs'')
-                                                    return ((), tcs'')
-                                        )
-unify (TVar a) x@(TVar b)         | (a == b) = return ()
-                                  | otherwise =  TCM (\tcs ->
-                                                        return (()
-                                                               , tcs {subs = (subs tcs) `mappend` (sub a x)}))
-unify (TVar a) x          = do if (a `elem` fvs x)
-                               then typeError
-                                    $ "unification of "
-                                    ++ (show a) ++ " and " ++ (show x)
-                                    ++ " will lead to infinite type"
-                               else TCM (\tcs ->
-                                            return (()
-                                                   ,tcs {subs = (subs tcs) `mappend` (sub a x)}))
-unify x (TVar a)          = do if (a `elem` fvs x)
-                               then typeError
-                                    $ "unification of "
-                                    ++ (show a) ++ " and " ++ (show x)
-                                    ++ " will lead to infinite type"
-                               else TCM (\tcs ->
-                                            return (()
-                                                   ,tcs {subs = (subs tcs) `mappend` (sub a x)}))
-unify (TConst a) (TConst b) | (a == b)  = return ()
-                            | otherwise = typeError
-                                $ "Cannot unify "
-                                  ++ (show a) ++ " and " ++ (show b)
-unify (TConst a)  b         = typeError
-                             $ "Cannot unify " ++ (show a)
-                                ++ " with " ++ show b
 
-unify a b                   = typeError $ "Cannot unify "
+class Unifyable t where
+  -- Unify is a function that tries to unify 2 types or returns an error
+  -- The goal will be to convert left Type into a right Type
+  -- so that substitute t1 (unify (ty1, ty2)) = ty2 if unify returns a Right _
+  -- we need to update the state i.e. subs tcm and return a ()
+  unify :: t -> t -> TCM ()
+
+
+instance Unifyable Kind where
+  unify (KArr k1 k2) (KArr k1' k2') = StateT (\tcs -> do tcs' <- (execStateT $ unify k1 k1') tcs
+                                                         let s = subs tcs'
+                                                         tcs'' <- (execStateT $ unify (s # k2) (s # k2')) tcs'
+                                                         return ((), tcs''))
+  unify (KVar a) k@(KVar b) | (a == b) = return ()
+                            | otherwise =
+                              StateT (\tcs ->
+                                        return ((), tcs {subs = modifySubstitution (subs tcs) (id) (\ m ->  m `mappend` (Map.singleton a k))}))
+  unify (KVar a) k          = do if (a `elem` fvs k)
+                                 then typeError
+                                           $ "unification of " ++ (show a) ++ " and " ++ (show k)
+                                           ++ " will lead to infinite kind"
+                                 else StateT (\tcs -> return (()
+                                                         , tcs {subs = modifySubstitution (subs tcs) id (\ m ->  m `mappend` (Map.singleton a k))}))
+  unify k (KVar a)          = unify (KVar a) k
+  unify KStar KStar = return ()
+  unify KStar k     = typeError $ "KStar cannot be unified with " ++ (show k)
+
+
+instance Unifyable Type where
+  unify :: Type ->  Type -> TCM ()
+  unify t1@(TArr _ a b) t2@(TArr _ c d) = StateT (\tcs -> do tcs' <- (execStateT $ unify a c) tcs
+                                                             let s = subs tcs'
+                                                             tcs'' <- (execStateT $ unify (s # b) (s # d)) tcs'
+                                                             return ((), tcs'')
+                                        )
+  unify (TVar ka a) x@(TVar kb b)         | (a == b) = return ()
+                                          | otherwise =  StateT (\tcs ->
+                                                                   return (()
+                                                                          , tcs {subs = (subs tcs) `mappend` (subty a x)}))
+  unify (TVar ka a) x          = do if (a `elem` fvs x)
+                                      then typeError
+                                           $ "unification of "
+                                           ++ (show a) ++ " and " ++ (show x)
+                                           ++ " will lead to infinite type"
+                                      else StateT (\tcs ->
+                                                  return (()
+                                                         ,tcs {subs = (subs tcs) `mappend` (subty a x)}))
+  unify x (TVar ka a)          = do if (a `elem` fvs x)
+                                      then typeError
+                                           $ "unification of "
+                                           ++ (show a) ++ " and " ++ (show x)
+                                           ++ " will lead to infinite type"
+                                      else StateT (\tcs ->
+                                                  return (()
+                                                   ,tcs {subs = (subs tcs) `mappend` (subty a x)}))
+  unify (TConst a) (TConst b) | (a == b)  = return ()
+                              | otherwise = typeError $ "Cannot unify "
+                                                  ++ (show a) ++ " and " ++ (show b)
+  unify (TConst a)  b         = typeError
+                                   $ "Cannot unify " ++ (show a)
+                                   ++ " with " ++ show b
+
+  unify (TApp t1 t2) t       =  
+  
+  unify a b                   = typeError $ "Cannot unify "
                                 ++ (show a) ++ " and " ++ (show b)
 
 

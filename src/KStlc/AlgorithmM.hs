@@ -17,8 +17,8 @@ module KStlc.AlgorithmM where
 --        https://dl.acm.org/citation.cfm?id=291892
 
 
-import Language
-import Util
+import KStlc.LanguageK
+import KStlc.Util
 
 
 import qualified Data.Map as Map

@@ -53,6 +53,10 @@ library
                      , Stlc.Util
                      , Stlc.AlgorithmW
                      , Stlc.AlgorithmM
+                     , KStlc.LanguageK
+                     , KStlc.Util
+                     , KStlc.AlgorithmW
+                     , KStlc.AlgorithmM
 
   -- Modules included in this library but not exported.
   -- other-modules:       
