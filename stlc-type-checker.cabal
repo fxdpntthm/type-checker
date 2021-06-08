@@ -54,6 +54,7 @@ library
                      , Stlc.AlgorithmW
                      , Stlc.AlgorithmM
                      , Stlc.Freshen
+                     , Stlc.Driver
                      -- , KStlc.LanguageK
                      -- , KStlc.Util
                      -- , KStlc.AlgorithmW

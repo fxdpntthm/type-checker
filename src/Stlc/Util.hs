@@ -17,20 +17,47 @@ import qualified Data.Hashable as H (hash)
 ------------------------
 
 data FnState = FnS {
-  seed :: Int -- threaded state seed
+    seed :: Int                -- threaded state seed
+  , table :: Map String Unique -- maps current variables to their uniques
                    }
   deriving (Show)
                
-initFnS = FnS {seed = 0}
-
 incFnS :: FnState -> FnState
-incFnS (FnS {seed = s}) = FnS {seed = s + 1}
+incFnS (FnS {seed = s, table = t }) = FnS {seed = s + 1, table=t}
 
 type FnM a = StateT FnState (Either String) a
 
-unique :: FnState -> String -> Unique
-unique s n = Unique { value = n, hash = H.hash n, scope = seed s}
+-- Generates a unique given a string
+unique :: Int -> String -> Unique
+unique s n = Unique { value = n, hash = H.hash n, scope = s}
 
+-- Generates a fresh unique to be used in this scope
+-- Overwrites the existing if it already existed in the table
+freshUnique :: String -> FnM Unique
+freshUnique n = do (FnS {table = t, seed = s}) <- get
+                   let u = unique s n
+                   let s' = FnS {table = Map.insert n u t, seed = s+1}
+                   put s'
+                   return u
+
+-- Gets the unique for the given name that is in this scope
+-- If there is none in scope, it creates one
+getUnique :: String -> FnM Unique
+getUnique n = do s <- get
+                 case Map.lookup n (table s) of
+                   Nothing -> freshUnique n
+                   Just u -> return u
+
+mkUnique = unique 0
+
+isZero = mkUnique "isZero"
+mult = mkUnique "mult"
+dec = mkUnique "dec"
+
+globals :: [Unique]
+globals = [ isZero, mult, dec]
+
+initFnS = FnS {seed = 0, table = Map.fromList (fmap (\u -> (value u, u)) globals)}
 
 -------------------------
 -- Type checking Utils --
@@ -42,10 +69,10 @@ typeError err = StateT (\_ ->  Left err)
 
 -- Looks up a variable and returns the scheme if it exists in the
 -- context
-lookupVar :: Context -> Id -> TCM Scheme
+lookupVar :: Context -> Unique -> TCM Scheme
 lookupVar (Context c) i = case (Map.lookup i c) of
   Just x -> return x
-  Nothing -> typeError $ "Variable " ++ i ++ " not in context"
+  Nothing -> typeError $ "Variable " ++ show i ++ " not in context"
 
 -- concretizes a scheme to specific type
 -- ie. takes all the quantified variables creates new type variables for them
@@ -68,6 +95,14 @@ fresh c = StateT (\(TcState s i) -> return (TVar (c:'`':(suffixGen !! i))
                                            , TcState s (i + 1)))
   where
     suffixGen = liftA2 (\i -> \pre -> [pre] ++ show i)  [ (1::Integer) .. ]  ['a' .. 'z']
+
+initTcS = TcState { subs = mempty, tno = 0 }
+
+
+globalCtx = Context $ Map.fromList [ (isZero, scheme (TArr (TConst TInt) (TConst TBool)))
+                                   , (mult, scheme (TArr (TConst TInt) (TArr (TConst TInt) (TConst TInt))))
+                                   , (dec, scheme (TArr (TConst TInt) (TConst TInt))) ]
+
 
 -- Typechecker state holds the substitutions that we would use
 -- in order to typecheck the term and a term number that will be used

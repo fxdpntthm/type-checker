@@ -88,7 +88,7 @@ unify a b                   = typeError $ "Cannot unify "
 -- Algorithm W should assign the most general type for the expression i.e.
 -- it should generate a Principal Type Scheme when
 -- given a context or should fail with an error
-algoW :: Context -> ExpPs -> TCM (Type, Substitution)
+algoW :: Context -> ExpFn -> TCM (Type, Substitution)
 -- Our Exp can be of 5 types EVar, ELit, ELam, EApp, ELet
 -- so we simply patten match on each constructor type and start assigning
 -- types
@@ -192,12 +192,32 @@ algoW gamma (ELet n e e') = do (ty, s) <- algoW gamma e                  -- Γ �
                                (ty', s') <- algoW gamma'' e'             -- Γ, x: sig ⊢ e' :T'
                                return (ty', s `mappend` s')
 
-algoW gamma (EFix f l@(ELam x e)) = do b <- fresh 'f'                                       --  new b
-                                       let gamma' = updateContext gamma f (scheme b)        --  gamma, f:b
-                                       (ty, s) <- algoW gamma' l
+{-
+
+
+
+       Γ ⊢ c : Bool    Γ ⊢ e1 :T  Γ ⊢ e1 :T 
+   -------------------------------------------------------- [Let]
+      Γ, c:Bool, e1: T, e2: T ⊢ if c then e1 else e2 : T
+
+
+-}
+algoW gamma (EIf c e1 e2) = do (ty, s) <- algoW gamma c                  -- Γ ⊢ c : T1
+                               (ty1, s1) <- algoW gamma e1               -- Γ ⊢ e1 : T2
+                               (ty2, s2) <- algoW gamma e2               -- Γ ⊢ e2 : T3
+                               unify ty1 ty2                             -- T2 = T3
+                               unify ty (TConst TBool)                   -- T1 = Bool
+                               return (ty1, s `mappend` s1 `mappend` s2)
+
+
+
+-- This is a mess
+algoW gamma (EFix f l@(ELam x e)) = do b <- fresh 'f'                                       -- f: T
+                                       let gamma' = updateContext gamma f (scheme b)        -- Γ, f:T
+                                       (ty, s) <- algoW gamma' l                            -- Γ, f:b ⊢ l : T'
                                        unify (substitute b s) ty
                                        tcst <- get
                                        let s' = subs tcst
-                                       return (substitute ty s', s `mappend` s')
+                                       return (ty, s')
 
-algoW _ _  = typeError "Cannot infer type"
+algoW _ e  = typeError $ "Cannot infer type: " ++ show e

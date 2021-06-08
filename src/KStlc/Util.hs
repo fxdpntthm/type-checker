@@ -54,7 +54,6 @@ data TcState = TcState { subs :: Substitution
                        , tno  :: Int
                        , kno  :: Int } deriving (Show, Eq)
 
-
 modifySubstitution :: Substitution
                    -> (Map Id Type -> Map Id Type)
                    -> (Map Id Kind -> Map Id Kind)

@@ -36,6 +36,7 @@ data Exp pass =
   | EApp (Exp pass) (Exp pass)              -- e e'
   | ELet (EId pass) (Exp pass) (Exp pass)   -- Let x = e in e'
   | EFix (EId pass) (Exp pass)              -- letrec f \x. e
+  | EIf (Exp pass) (Exp pass) (Exp pass)
 --  deriving (Show, Eq, Ord)
 
 data Lit = LitB Bool                  -- Literals for Bool
@@ -61,8 +62,10 @@ instance Show (EId (Pass p)) => Show (Exp (Pass p)) where
   show (EApp e1 e2) = "(" ++ show e1 ++ ") (" ++ show e2 ++ ")"
   show (ELet x e1 e2) = "let " ++ show x ++ " = " ++ show e1 ++ " in " ++ show e2
   show (EFix x e) = "letrec " ++ show x ++ " = " ++ show e
+  show (EIf c e1 e2) = "if " ++ show c ++ " then " ++ show e1 ++ " else " ++ show e2
   
 data Unique = Unique { value :: String, hash :: Int, scope :: Int }
+
 instance Eq Unique where
   u1 == u2 = hash u1 == hash u2
 instance Show Unique where
@@ -112,7 +115,13 @@ data Iota = TBool                     -- Types for Booleans
 data Type = TVar Id                   -- Type variable
           | TArr Type Type            -- Arrow Type -> Type
           | TConst Iota               -- Concrete Type
-          deriving (Show, Eq)
+          deriving (Eq)
+
+instance Show Type where
+  show (TVar i) = i
+  show (TArr t1 t2) = "(" ++ show t1 ++ " -> " ++ show t2 ++ ")"
+  show (TConst TBool) = "Bool"
+  show (TConst TInt) = "Int"
 
 class FreeVariables a where
   fvs :: a -> Set Id
@@ -201,7 +210,7 @@ data UnifyError = UnificationFailed String
 --                        Forall (Set.fromList ["a"])
 --                        (TArr (TArr (TVar "a") (TVar "a")) (TVar "a")))
 --                      ]
-newtype Context =  Context (Map.Map Id Scheme)
+newtype Context =  Context (Map.Map Unique Scheme)
   deriving (Show, Eq, Semigroup, Monoid)
 
 -- get all the free variables from the context
@@ -217,5 +226,5 @@ instance Substitutable Context where
   substitute (Context c) s = Context (flip (substitute) s <$> c)
 
 -- extend the context by adding an (id, scheme) pair
-updateContext :: Context -> Id -> Scheme -> Context
+updateContext :: Context -> Unique -> Scheme -> Context
 updateContext (Context gamma) e ty = Context (Map.insert e ty gamma)
