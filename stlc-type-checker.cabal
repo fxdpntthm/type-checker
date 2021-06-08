@@ -30,7 +30,7 @@ author:              Apoorv Ingle
 
 -- An email address to which users can send suggestions, bug reports, and
 -- patches.
-maintainer:          ani@ku.edu
+maintainer:          apoorv-ingle@uiowa.edu
 
 -- A copyright notice.
 -- copyright:
@@ -44,7 +44,7 @@ build-type:          Simple
 extra-source-files:  ChangeLog.md, README.md
 
 -- Constraint on the version of Cabal needed to build this package.
-cabal-version:       >=2.0
+cabal-version:       2.0
 
 
 library
@@ -53,10 +53,10 @@ library
                      , Stlc.Util
                      , Stlc.AlgorithmW
                      , Stlc.AlgorithmM
-                     , KStlc.LanguageK
-                     , KStlc.Util
-                     , KStlc.AlgorithmW
-                     , KStlc.AlgorithmM
+                     -- , KStlc.LanguageK
+                     -- , KStlc.Util
+                     -- , KStlc.AlgorithmW
+                     -- , KStlc.AlgorithmM
 
   -- Modules included in this library but not exported.
   -- other-modules:       
@@ -65,9 +65,9 @@ library
   -- other-extensions:
 
   -- Other library packages from which modules are imported.
-  build-depends:       base ^>= 4.12
+  build-depends:       base ^>= 4.13
                      , containers ^>= 0.6
-                     , mtl >=2.2.1 && < 2.3
+                     , mtl >=2.2.1 && < 2.5
 
   -- Directories containing source files.
   hs-source-dirs:      src
@@ -79,9 +79,9 @@ library
 Test-Suite stlc-algo-w-test
   Type:                exitcode-stdio-1.0
   Main-is:             Stlc/sampleW.hs
-  build-depends:       base ^>= 4.12
+  build-depends:       base ^>= 4.13
                      , containers ^>= 0.6
-                     , mtl >=2.2.1 && < 2.3
+                     , mtl >=2.2.1 && < 2.5
                      , stlc-type-checker
 
   hs-source-dirs:      test
@@ -90,9 +90,9 @@ Test-Suite stlc-algo-w-test
 Test-Suite algo-m-test
   Type:                exitcode-stdio-1.0
   Main-is:             Stlc/sampleM.hs
-  build-depends:       base ^>= 4.12
+  build-depends:       base ^>= 4.13
                      , containers ^>= 0.6
-                     , mtl >=2.2.1 && < 2.3
+                     , mtl >=2.2.1 && < 2.5
                      , stlc-type-checker
 
   hs-source-dirs:      test
