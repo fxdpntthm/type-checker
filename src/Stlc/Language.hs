@@ -1,6 +1,13 @@
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds, PolyKinds #-}
+
 module Stlc.Language where
 
 import qualified Data.Map as Map
@@ -9,38 +16,85 @@ import Data.List (all, intersect)
 import Data.Map (Map)
 import Data.Set (Set)
 
-
--- All ids are Strings
 type Id = String
 
+data Phase = Parsed     
+           | Freshened  
+           | Tc         
+           deriving (Show, Eq, Ord)
+
+data Pass (p :: Phase)  -- What compiler pass are we in?
+type PsPass = Pass 'Parsed
+type FnPass = Pass 'Freshened
+type TcPass = Pass 'Tc
+  
 -- Simple expressions in our language based on lambda calculus
-data Exp = EVar Id                    -- "a", "b"
-         | ELit Lit                   -- T/F
-         | ELam Id Exp                -- \x. ..
-         | EApp Exp Exp               -- e e'
-         | ELet Id Exp Exp            -- Let x = e in e'
-         | EFix Exp Exp              -- letrec f \x. e
-         deriving (Show, Eq, Ord)
+data Exp pass =
+    EVar (EId pass)                         -- "a", "b"
+  | ELit Lit                                -- T/F
+  | ELam (EId pass) (Exp pass)              -- \x. ..
+  | EApp (Exp pass) (Exp pass)              -- e e'
+  | ELet (EId pass) (Exp pass) (Exp pass)   -- Let x = e in e'
+  | EFix (EId pass) (Exp pass)              -- letrec f \x. e
+--  deriving (Show, Eq, Ord)
 
 data Lit = LitB Bool                  -- Literals for Bool
          | LitI Int                   -- Literals for Integer
-         deriving (Show, Eq, Ord)
+         deriving (Eq, Ord)
+instance Show Lit where
+  show (LitB b) = show b
+  show (LitI i) = show i
+
+type ExpPs = Exp PsPass     -- Expression obtained after parsing      
+type ExpFn = Exp FnPass     -- Expression obtained after name freshing
+type ExpTc = Exp TcPass     -- Expression obtained after Type checking
+
+type family EId a
+type instance EId PsPass = String
+type instance EId FnPass = Unique
+type instance EId TcPass = TUnique
+
+instance Show (EId (Pass p)) => Show (Exp (Pass p)) where
+  show (EVar i) = show i
+  show (ELit t) = show t
+  show (ELam x b) = "\\ " ++ show x ++ " -> " ++ show b
+  show (EApp e1 e2) = "(" ++ show e1 ++ ") (" ++ show e2 ++ ")"
+  show (ELet x e1 e2) = "let " ++ show x ++ " = " ++ show e1 ++ " in " ++ show e2
+  show (EFix x e) = "letrec " ++ show x ++ " = " ++ show e
+  
+data Unique = Unique { value :: String, hash :: Int, scope :: Int }
+instance Eq Unique where
+  u1 == u2 = hash u1 == hash u2
+instance Show Unique where
+  show (Unique {value = v, scope = s}) = v ++ "`" ++ show s
+instance Ord Unique where
+  u1 <= u2 = hash u1 <= hash u2
+
+data TUnique = TUnique { uq :: Unique, ty :: Type}
+instance Eq TUnique where
+  u1 == u2 = hash (uq u1) == hash (uq u2)
+instance Show TUnique where
+  show (TUnique {uq = u, ty = t}) = show u ++ "::" ++ show t
+instance Ord TUnique where
+  u1 <= u2 = hash (uq u1) <= hash (uq u2)
 
 -- Some simple Expressions in our language
 
-exp1 :: Exp
+exp1, exp2 :: ExpPs
 exp1 = EVar "a"        -- a
 
 exp2 = ELam "a" exp1  -- \ a. a
 
+litT, litF :: Lit
 litT = LitB True       -- True
 litF = LitB False      -- False
 
+lit0, lit1 :: Lit
 lit0 = LitI 0        -- 0
 lit1 = LitI 1        -- 1
 
 -- \ x. (True x)
-expInvalid :: Exp
+expInvalid :: ExpPs
 expInvalid = ELam "x" (EApp (ELit litT) (EVar "x"))
 
 -- Even though the above example is an expression it doesn't make sense

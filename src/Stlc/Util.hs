@@ -10,7 +10,31 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Set as Set
 import Data.Set (Set, (\\))
+import qualified Data.Hashable as H (hash)
 
+------------------------
+-- Freshening Utils  ---
+------------------------
+
+data FnState = FnS {
+  seed :: Int -- threaded state seed
+                   }
+  deriving (Show)
+               
+initFnS = FnS {seed = 0}
+
+incFnS :: FnState -> FnState
+incFnS (FnS {seed = s}) = FnS {seed = s + 1}
+
+type FnM a = StateT FnState (Either String) a
+
+unique :: FnState -> String -> Unique
+unique s n = Unique { value = n, hash = H.hash n, scope = seed s}
+
+
+-------------------------
+-- Type checking Utils --
+-------------------------
 
 -- Convinence function to return an error
 typeError :: String -> TCM a
@@ -52,3 +76,5 @@ data TcState = TcState { subs :: Substitution
                        , tno  :: Int } deriving (Show, Eq)
 
 type TCM a = StateT TcState  (Either String) a
+
+

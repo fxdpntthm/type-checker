@@ -79,7 +79,7 @@ unify a b                   = typeError $ "Cannot unify "
 --    2. It expects a type to be given for which a substitution is returned.
 --    3. Unify is called at for Literal, Variable and Lambda (as opposed to Application call in algorithmW)
 
-algoM :: Context -> Exp -> Type -> TCM Substitution
+algoM :: Context -> ExpPs -> Type -> TCM Substitution
 -- patten match on all the expression constructs
 
 
@@ -179,8 +179,8 @@ algoM gamma (ELet x e e') expty = do b <- fresh 'e'
                                      s' <- algoM (substitute gamma' s) e' (substitute expty s)
                                      return (substitute s s')
 
-algoM gamma (EFix (EVar f) l@(ELam _ _)) expty = do b <- fresh 'f'
-                                                    let gamma' = updateContext gamma f (scheme b)
-                                                    algoM gamma' l expty
+algoM gamma (EFix f l@(ELam _ _)) expty = do b <- fresh 'f'
+                                             let gamma' = updateContext gamma f (scheme b)
+                                             algoM gamma' l expty
 
 algoM _ _ _ = typeError "Cannot typecheck current expression"

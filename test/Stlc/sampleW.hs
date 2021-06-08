@@ -82,5 +82,5 @@ main = do
                     ) (TcState mempty 0)
   putStrLn $ "+ should succeed:\n\t -- (id: \\/ a. a -> a) |- Fix id \\x. id True"
   putStrLn $ show $ (execStateT $ algoW (Context $ Map.singleton "id" (Forall (Set.fromList ["a"]) (TArr (TVar "a") (TVar "a"))))
-                     (EFix (EVar "id") (ELam "x" (EApp (EVar "id") (ELit $ LitB False))))
+                     (EFix "id" (ELam "x" (EApp (EVar "id") (ELit $ LitB False))))
                     ) (TcState mempty 0)

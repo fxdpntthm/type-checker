@@ -88,7 +88,7 @@ unify a b                   = typeError $ "Cannot unify "
 -- Algorithm W should assign the most general type for the expression i.e.
 -- it should generate a Principal Type Scheme when
 -- given a context or should fail with an error
-algoW :: Context -> Exp -> TCM (Type, Substitution)
+algoW :: Context -> ExpPs -> TCM (Type, Substitution)
 -- Our Exp can be of 5 types EVar, ELit, ELam, EApp, ELet
 -- so we simply patten match on each constructor type and start assigning
 -- types
@@ -192,12 +192,12 @@ algoW gamma (ELet n e e') = do (ty, s) <- algoW gamma e                  -- Γ �
                                (ty', s') <- algoW gamma'' e'             -- Γ, x: sig ⊢ e' :T'
                                return (ty', s `mappend` s')
 
-algoW gamma (EFix f'@(EVar f) l@(ELam x e)) = do b <- fresh 'f'                                       --  new b
-                                                 let gamma' = updateContext gamma f (scheme b)        --  gamma, f:b
-                                                 (ty, s) <- algoW gamma' l
-                                                 unify (substitute b s) ty
-                                                 tcst <- get
-                                                 let s' = subs tcst
-                                                 return (substitute ty s', s `mappend` s')
+algoW gamma (EFix f l@(ELam x e)) = do b <- fresh 'f'                                       --  new b
+                                       let gamma' = updateContext gamma f (scheme b)        --  gamma, f:b
+                                       (ty, s) <- algoW gamma' l
+                                       unify (substitute b s) ty
+                                       tcst <- get
+                                       let s' = subs tcst
+                                       return (substitute ty s', s `mappend` s')
 
 algoW _ _  = typeError "Cannot infer type"
