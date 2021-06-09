@@ -186,15 +186,13 @@ algoW gamma (EApp e e') = do (ty, s)  <- algoW gamma e         -- Γ ⊢ e : T -
 
 -}
 algoW gamma (ELet n e e') = do (ty, s) <- algoW gamma e                  -- Γ ⊢ e : T
-                               let gamma' = substitute gamma s
-                               sig <- generalize gamma' ty
-                               let gamma'' = updateContext gamma' n sig  -- Γ, n: sig
+                               -- let gamma' = substitute gamma s
+                               sig <- generalize gamma ty
+                               let gamma'' = updateContext gamma n sig  -- Γ, n: sig
                                (ty', s') <- algoW gamma'' e'             -- Γ, x: sig ⊢ e' :T'
                                return (ty', s `mappend` s')
 
 {-
-
-
 
        Γ ⊢ c : Bool    Γ ⊢ e1 :T  Γ ⊢ e1 :T 
    -------------------------------------------------------- [Let]

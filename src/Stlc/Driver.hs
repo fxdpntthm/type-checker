@@ -6,12 +6,15 @@ import Stlc.Language
 import Stlc.Util
 import Stlc.Freshen
 import Stlc.AlgorithmW
+import Stlc.AlgorithmM
 import Control.Monad.State
 import Debug.Trace
 
-runPipeline :: ExpPs -> Either String Type
-runPipeline e = do (fe, _) <- runStateT (freshen e) initFnS
-                   (te, _) <- runStateT (algoW globalCtx fe) initTcS
-                   -- traceM $ show fe
-                   return (fst te)
+runPipelineW :: ExpPs -> Either String Type
+runPipelineW e = do (fe, _) <- runStateT (freshen e) initFnS
+                    (te, _) <- runStateT (algoW globalCtx fe) initTcS
+                    -- traceM $ show fe
+                    return (fst te)
   
+runPipelineM e ty= do (fe, _) <- runStateT (freshen e) initFnS
+                      runStateT (algoM globalCtx fe ty) initTcS

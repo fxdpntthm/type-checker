@@ -27,7 +27,10 @@ sub1 = Subt (Map.singleton "a" (TVar "b"))
 sub2 :: Substitution
 sub2 = Subt (Map.singleton "b" (TVar "c"))
 
-
+factExp :: ExpPs
+factExp = EFix "fact" (ELam "n" (EIf (EApp (EVar "isZero") (EVar "n"))
+                                     (ELit $ LitI 1)
+                                     (EApp (EApp (EVar "mult") (EVar "n")) (EApp (EVar "fact") (EApp (EVar "dec") (EVar "n"))))))
 
 main :: IO ()
 main = do
@@ -60,27 +63,22 @@ main = do
                         (te, _) <- (runStateT $ algoW mempty fe) initTcS
                         return $ fst te)
   putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x) (False)"
-  putStrLn $ show $ runPipeline (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
+  putStrLn $ show $ runPipelineW (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
 
   putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x)"
-  putStrLn $ show $ runPipeline (ELam "x" (EVar "x"))
+  putStrLn $ show $ runPipelineW (ELam "x" (EVar "x"))
 
   putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x) (\\y. y)"
-  putStrLn $ show $ runPipeline (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
+  putStrLn $ show $ runPipelineW (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
 
   putStrLn $ "+ should fail:\n\t -- () |- ((\\x. x) (False))(\\x.x)"
-  putStrLn $ show $ runPipeline (EApp (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
+  putStrLn $ show $ runPipelineW (EApp (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
                                  (ELam "x" (EVar "x")))
     
   putStrLn $ "+ should succeed:\n\t -- () |- let id = \\x.x in (id False)"
-  putStrLn $ show $ runPipeline (ELet "id" (ELam "x" (EVar "x"))
+  putStrLn $ show $ runPipelineW (ELet "id" (ELam "x" (EVar "x"))
                                  (EApp (EVar "id") (ELit $ LitB False)))
 
   putStrLn $ "+ should succeed:\n\t -- (id: \\/ a. a -> a) |- Fix id \\x. id True"
-  putStrLn $ show $ runPipeline factExp
+  putStrLn $ show $ runPipelineW factExp
 
-
-factExp :: ExpPs
-factExp = EFix "fact" (ELam "n" (EIf (EApp (EVar "isZero") (EVar "n"))
-                                     (ELit $ LitI 1)
-                                     (EApp (EApp (EVar "mult") (EVar "n")) (EApp (EVar "fact") (EApp (EVar "dec") (EVar "n"))))))

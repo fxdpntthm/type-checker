@@ -62,6 +62,10 @@ initFnS = FnS {seed = 0, table = Map.fromList (fmap (\u -> (value u, u)) globals
 -------------------------
 -- Type checking Utils --
 -------------------------
+-- empty substitution
+eSub :: Substitution
+eSub = Subt Map.empty
+
 
 -- Convinence function to return an error
 typeError :: String -> TCM a

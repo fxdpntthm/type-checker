@@ -175,7 +175,12 @@ instance Substitutable Scheme where
 --    It is a process of replacing type of one term with another type
 --    It will be used in specializing type variables in our typechecking algorithm
 newtype Substitution = Subt (Map.Map Id Type)
-  deriving (Show, Eq, Semigroup, Monoid)
+  deriving (Eq, Semigroup, Monoid)
+
+instance Show Substitution where
+  show (Subt m) = "\nSubst {" ++ (foldr (\b n -> b ++ "\n" ++ n) "" elems) ++ "}"
+    where
+    elems = fmap (\(i, t) -> "(" ++ i ++ ":->" ++ show t ++ ")") (Map.toList m)
 
 sub :: Id -> Type -> Substitution
 sub a t = Subt (Map.singleton a t)
@@ -198,7 +203,7 @@ instance Substitutable Substitution where
   substitute :: Substitution -> Substitution -> Substitution
   substitute s s'@(Subt m) = if consistent s s'
                              then Subt (fmap (flip substitute s) m)
-                             else error $ "Substituion is not composable for:\n\t" ++ show s ++ "\n\t" ++ show s' 
+                             else error $ "Substitution is not composable for:\n\t" ++ show s ++ "\n\t" ++ show s' 
 
 data UnifyError = UnificationFailed String
   deriving (Show, Eq)

@@ -4,6 +4,7 @@ import Stlc.Language
 import Stlc.AlgorithmM
 import Stlc.Util
 import Stlc.Freshen
+import Stlc.Driver
 
 import Data.Map as Map
 import Data.Set as Set
@@ -25,10 +26,6 @@ sub1 = Subt (Map.singleton "a" (TVar "b"))
 
 sub2 :: Substitution
 sub2 = Subt (Map.singleton "b" (TVar "c"))
-
-
-runPipeline e ty= do (fe, _) <- runStateT (freshen e) initFnS
-                     runStateT (algoM globalCtx fe ty) initTcS
                      
 
 
@@ -59,30 +56,30 @@ main = do
                      (EVar $ mkUnique "x") (TVar "a"))
                             initTcS
   putStr $ "+ should succeed:\n\t"
-  putStrLn $ show $ runPipeline (ELam "x" (ELit $ LitB True)) (TArr (TVar "a") (TConst TBool))
+  putStrLn $ show $ runPipelineM (ELam "x" (ELit $ LitB True)) (TArr (TVar "a") (TConst TBool))
 
   putStr $ "+ should succeed:\n\t"
-  putStrLn $ show $ runPipeline  (ELam "x" (ELit $ LitB True)) (TVar "a")
+  putStrLn $ show $ runPipelineM  (ELam "x" (ELit $ LitB True)) (TVar "a")
 
   putStr $ "+ should succeed:\n\t |- (\\x. \\y. True)\n\t" 
-  putStrLn $ show $ runPipeline (ELam "x" (ELam "y" $ ELit $ LitB True)) (TArr (TVar "a") (TArr (TVar "b") (TConst TBool)))
+  putStrLn $ show $ runPipelineM (ELam "x" (ELam "y" $ ELit $ LitB True)) (TArr (TVar "a") (TArr (TVar "b") (TConst TBool)))
 
   putStr $ "+ should succeed:\n\t |- (\\x.x) False a\n\t"
-  putStrLn $ show $ runPipeline (EApp (ELam "x" (EVar "x")) (ELit $ LitB False)) (TVar "a")
+  putStrLn $ show $ runPipelineM (EApp (ELam "x" (EVar "x")) (ELit $ LitB False)) (TVar "a")
 
   putStr $ "+ should succeed:\n\t -- |- (\\x.x) (\\y.y) a\n\t"
-  putStrLn $ show $ runPipeline (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y"))) (TArr (TVar "a") (TVar "a"))
+  putStrLn $ show $ runPipelineM (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y"))) (TArr (TVar "a") (TVar "a"))
 
   putStr $ "+ should fail:\n\t -- (\\x.x)(False)(\\x.x)\n\t"
-  putStrLn $ show $ runPipeline
+  putStrLn $ show $ runPipelineM
                      (EApp (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
                            (ELam "x" (EVar "x")))
                        (TConst TBool)
 
   putStr $ "+ should succeed:\n\t -- (let id = \\x -> x in (id False))\n\t"
-  putStrLn $ show $ runPipeline
+  putStrLn $ show $ runPipelineM
                      (ELet "id" (ELam "x" (EVar "x"))
                        (EApp (EVar "id") (ELit $ LitB False)))
-                       (TConst TBool)
+                       (TVar "a")
 
 

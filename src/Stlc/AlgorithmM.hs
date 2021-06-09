@@ -29,47 +29,46 @@ import Control.Monad.State
 
 -- Unify is a function that tries to unify 2 types or returns an error
 -- The goal will be to convert left Type into a right Type
--- so that substitute t1 (unify (ty1, ty2)) = ty2 if unify returns a Right _
+-- so that substitute t1 (unify (ty1, ty2)) = {ty1 :-> ty2}
 -- we need to update the state i.e. subs tcm and return a ()
 unify :: Type ->  Type -> TCM Substitution
-unify t1@(TArr a b) t2@(TArr c d) = StateT (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
-                                                    tcs' <- (execStateT $ unify a c) tcs
-                                                    -- traceM ("DEBUG (unify a c): " ++  show tcs')
-                                                    let s = subs tcs'
-                                                    tcs'' <- (execStateT $ unify (substitute b s) (substitute d s)) tcs'
-                                                    -- traceM ("DEBUG (unify b d): " ++  show tcs'')
-                                                    return (subs tcs'', tcs'')
-                                        )
-unify (TVar a) x@(TVar b)         | (a == b) = return (Subt Map.empty)
-                                  | otherwise =  StateT (\tcs ->
-                                                        return ((subs tcs) `mappend` (sub a x)
-                                                               ,tcs {subs = (subs tcs) `mappend` (sub a x)}))
-unify (TVar a) x          = do if (a `elem` fvs x)
-                               then typeError
-                                    $ "unification of "
-                                    ++ (show a) ++ " and " ++ (show x)
-                                    ++ " will lead to infinite type"
-                               else StateT (\tcs ->
-                                            return ((subs tcs) `mappend` (sub a x)
-                                                   , tcs { subs = (subs tcs) `mappend` (sub a x)}))
-unify x (TVar a)          = do if (a `elem` fvs x)
-                               then typeError
-                                    $ "unification of "
-                                    ++ (show a) ++ " and " ++ (show x)
-                                    ++ " will lead to infinite type"
-                               else StateT (\tcs ->
-                                            return ((subs tcs) `mappend` (sub a x)
-                                                   , tcs { subs = (subs tcs) `mappend` (sub a x)}))
-unify (TConst a) (TConst b) | (a == b)  = return (Subt Map.empty)
-                            | otherwise = typeError
-                                $ "Cannot unify "
-                                  ++ (show a) ++ " and " ++ (show b)
-unify (TConst a)  b         = typeError
-                             $ "Cannot unify " ++ (show a)
-                                ++ " with " ++ show b
 
-unify a b                   = typeError $ "Cannot unify "
-                                ++ (show a) ++ " and " ++ (show b)
+unify t1@(TArr a b) t2@(TArr c d) = do s <- unify a c
+                                       s'<- unify (substitute b s) (substitute d s)
+                                       return s'
+                                       
+unify (TVar a) x@(TVar b)         | (a == b) = return eSub
+                                  | otherwise =  do tcs <- get
+                                                    let new_s = sub a x
+                                                    let tcs' = tcs {subs = subs tcs `mappend` new_s}
+                                                    put tcs'
+                                                    return new_s
+unify x1@(TVar a) x          = do if (a `elem` fvs x)
+                                    then typeError $ infiniteType x1 x
+                                    else do tcs <- get
+                                            let new_s = sub a x
+                                            let tcs' = tcs {subs = subs tcs `mappend` new_s}
+                                            put tcs'
+                                            return new_s
+
+unify x x1@(TVar a)          = do if (a `elem` fvs x)
+                                    then typeError $ infiniteType x x1
+                                    else do tcs <- get
+                                            let new_s = sub a x
+                                            let tcs' = tcs {subs = subs tcs `mappend` new_s}
+                                            put tcs'
+                                            return new_s
+unify t1@(TConst a) t2@(TConst b) | (a == b)  = return eSub
+                                  | otherwise = typeError $ cannotUnify t1 t2
+
+unify a b                   = typeError $ cannotUnify a b
+
+infiniteType t1 t2 = "unification of "
+                     ++ show t1 ++ " and " ++ show t2
+                     ++ " will lead to infinite type"
+cannotUnify t1 t2 = "Cannot unify " ++ show t1
+                    ++ " with " ++ show t2
+
 
 -- This algorithm takes in the context, expression and
 -- the expected type (or type constraint) of the expression and returns the
@@ -129,9 +128,9 @@ algoM gamma (EVar x) expty = do sig <- lookupVar gamma x   -- x : σ ϵ Γ
 -}
 algoM gamma (ELam x e) expty = do b1 <- fresh 'x'
                                   b2 <- fresh 'e'
-                                  s  <- unify (TArr b1 b2) expty
                                   let gamma' = updateContext gamma x (scheme b1)
-                                  s' <- algoM (substitute gamma' s) e (substitute b2 s)
+                                  s' <- algoM gamma' e b2
+                                  s  <- unify (TArr b1 b2) expty
                                   return (substitute s s')
 
 {-
@@ -154,9 +153,7 @@ algoM gamma (ELam x e) expty = do b1 <- fresh 'x'
 -}
 algoM gamma (EApp e e') expty = do b <- fresh 'e'
                                    s <- algoM gamma e (TArr b expty)
-                                   let gamma' = substitute gamma s
-                                   let b' = substitute b s
-                                   s' <- algoM gamma' e' b'
+                                   s' <- algoM gamma e' b
                                    return (substitute s s')
 
 {-
@@ -172,11 +169,11 @@ algoM gamma (EApp e e') expty = do b <- fresh 'e'
                   Γ ⊢ let x = e in e' : T'
 
 -}
-algoM gamma (ELet x e e') expty = do b <- fresh 'e'
+algoM gamma (ELet x e e') expty = do b <- fresh 'b'
                                      s <- algoM gamma e b
-                                     sig <- generalize gamma (substitute b s)
+                                     sig <- generalize gamma b
                                      let gamma' = updateContext gamma x sig
-                                     s' <- algoM (substitute gamma' s) e' (substitute expty s)
+                                     s' <- algoM gamma' e' expty
                                      return (substitute s s')
 
 algoM gamma (EFix f l@(ELam _ _)) expty = do b <- fresh 'f'
