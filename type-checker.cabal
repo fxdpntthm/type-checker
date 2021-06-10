@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 -- The name of the package.
-name:                stlc-type-checker
+name:                type-checker
 
 -- The package version.  See the Haskell package versioning policy (PVP) 
 -- for standards guiding when and how versions should be incremented.
@@ -13,11 +13,11 @@ name:                stlc-type-checker
 version:             0.1.0.0
 
 -- A short (one-line) description of the package.
-synopsis:            Simple implementation of Milner-Dumas algorithm W in Haskell
+synopsis:            An implementation of Hinley-Milner-Damas Algorithm W & Algorithm M in Haskell
 
 -- A longer description of the package.
 description: This project implements a type checker for
-             simply typed lambda calculus using algorithm W and algorithm M
+             typed lambda calculus using algorithm W and algorithm M
 
 -- The license under which the package is released.
 license:             MIT
@@ -81,7 +81,7 @@ Test-Suite stlc-algo-w-test
   build-depends:       base ^>= 4.13
                      , containers ^>= 0.6
                      , mtl >=2.2.1 && < 2.5
-                     , stlc-type-checker
+                     , type-checker
 
   hs-source-dirs:      test, test/HM
   default-language:    Haskell2010
@@ -93,7 +93,7 @@ Test-Suite algo-m-test
   build-depends:       base ^>= 4.13
                      , containers ^>= 0.6
                      , mtl >=2.2.1 && < 2.5
-                     , stlc-type-checker
+                     , type-checker
 
   hs-source-dirs:      test, test/HM
   default-language:    Haskell2010
@@ -106,7 +106,7 @@ Test-Suite algo-b-test
   build-depends:       base ^>= 4.13
                      , containers ^>= 0.6
                      , mtl >=2.2.1 && < 2.5
-                     , stlc-type-checker
+                     , type-checker
 
   hs-source-dirs:      test, test/HM
   default-language:    Haskell2010
