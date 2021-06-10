@@ -115,7 +115,7 @@ algoW gamma (ELam x e) = do x' <- fresh 'x'                             -- x:T
                             let gamma' =                                -- Γ, x:T
                                   updateContext gamma x (scheme x')
                             (ty, s) <- algoW gamma' e                   -- e: T'
-                            return (TArr (substitute x' s) ty, s)        -- T -> T'
+                            return (TArr (substitute s x') ty, s)        -- T -> T'
 
 {-
    rule for application goes as follows:
@@ -135,12 +135,12 @@ algoW gamma (ELam x e) = do x' <- fresh 'x'                             -- x:T
   and then fire unify to ensure the complete expression is well typed
 -}
 algoW gamma (EApp e e') = do (ty, s)  <- algoW gamma e                         -- Γ ⊢ e : T -> T'
-                             (ty', s') <- algoW (substitute gamma s) e'        -- Γ ⊢ e' :T
+                             (ty', s') <- algoW (substitute s gamma) e'        -- Γ ⊢ e' :T
                              f <- fresh 'f'
-                             unify (substitute ty s') (TArr ty' f)
+                             unify (substitute s' ty) (TArr ty' f)
                              s'' <- get
                              let subst = subs s''
-                             return $ ((substitute f subst), (subst `mappend` s' `mappend` s))
+                             return $ ((substitute subst f), (subst `mappend` s' `mappend` s))
 
 
 {-
@@ -185,7 +185,7 @@ algoW gamma (EIf c e1 e2) = do (ty, s) <- algoW gamma c                  -- Γ �
 algoW gamma (EFix f l@(ELam x e)) = do b <- fresh 'f'                                       -- f: T
                                        let gamma' = updateContext gamma f (scheme b)        -- Γ, f:T
                                        (ty, s) <- algoW gamma' l                            -- Γ, f:b ⊢ l : T'
-                                       unify (substitute b s) ty
+                                       unify (substitute s b) ty
                                        tcst <- get
                                        let s' = subs tcst
                                        return (ty, s')

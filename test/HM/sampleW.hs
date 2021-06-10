@@ -72,7 +72,11 @@ main = do
   putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x) (\\y. y)"
   let v =  runPipelineW (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
   shouldPass v
-  
+
+  putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x) (\\y. y) True"
+  let v =  runPipelineW (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")) `EApp` (ELit $ LitB True))
+  shouldPass v
+
   putStrLn $ "+ should fail:\n\t -- () |- ((\\x. x) (False))(\\x.x)"
   let v = runPipelineW (EApp (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
                                  (ELam "x" (EVar "x")))
@@ -83,6 +87,12 @@ main = do
                                  (EApp (EVar "id") (ELit $ LitB False)))
   shouldPass v
   
-  putStrLn $ "+ should succeed:\n\t -- (id: \\/ a. a -> a) |- Fix id \\x. id True"
-  let v = runPipelineW factExp
+  putStr $ "+ should succeed:\n\t -- letrec f = \\ x -> if x = 0 then 1 else x * (fact x-1) \n\t"
+  let v =  runPipelineW factExp
+  shouldPass v
+
+
+  putStr $ "+ should succeed:\n\t -- (let id = \\x -> x in (id id))\n\t"
+  let v =  runPipelineW (ELet "id" (ELam "x" (EVar "x"))
+                         (EApp (EVar "id") (EVar "id")))
   shouldPass v

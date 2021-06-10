@@ -53,9 +53,10 @@ mkUnique = unique 0
 isZero = mkUnique "isZero"
 mult = mkUnique "mult"
 dec = mkUnique "dec"
+eq1 = mkUnique "eq1"
 
 globals :: [Unique]
-globals = [ isZero, mult, dec]
+globals = [ isZero, mult, dec, eq1]
 
 initFnS = FnS {seed = 0, table = Map.fromList (fmap (\u -> (value u, u)) globals)}
 
@@ -66,6 +67,9 @@ initFnS = FnS {seed = 0, table = Map.fromList (fmap (\u -> (value u, u)) globals
 eSub :: Substitution
 eSub = Subt Map.empty
 
+-- empty substitution
+eCtx :: Context
+eCtx = Context Map.empty
 
 -- Convinence function to return an error
 typeError :: String -> TCM a
@@ -84,7 +88,7 @@ lookupVar (Context c) i = case (Map.lookup i c) of
 instantiate :: Scheme -> TCM Type
 instantiate (Forall q ty) = do q' <- mapM (const $ fresh 't') (Set.toList $ q)
                                let s = Subt (Map.fromList $ zip (Set.toList q) q')
-                               return (substitute ty s)
+                               return (substitute s ty)
 
 -- creates a scheme given a context and a type
 -- the free variables in the generated scheme
@@ -92,6 +96,11 @@ instantiate (Forall q ty) = do q' <- mapM (const $ fresh 't') (Set.toList $ q)
 generalize :: Context -> Type -> TCM Scheme
 generalize gamma ty = return $ Forall qs ty
   where qs = fvs ty \\ fvs gamma
+
+generalize' :: Context -> Type -> Scheme
+generalize' gamma ty = Forall qs ty
+  where qs = fvs ty \\ fvs gamma
+
 
 -- Generate unique type variable for a new term
 fresh :: Char -> TCM Type
@@ -105,8 +114,12 @@ initTcS = TcState { subs = mempty, tno = 0 }
 
 globalCtx = Context $ Map.fromList [ (isZero, scheme (TArr (TConst TInt) (TConst TBool)))
                                    , (mult, scheme (TArr (TConst TInt) (TArr (TConst TInt) (TConst TInt))))
-                                   , (dec, scheme (TArr (TConst TInt) (TConst TInt))) ]
+                                   , (dec, scheme (TArr (TConst TInt) (TConst TInt)))
+                                   , (eq1, scheme ((TConst TInt) `TArr` (TConst TBool)))]
 
+-- after the inference is done, we get a type, but we'd like to generalize that to a scheme
+tidyType :: Type -> Scheme
+tidyType = generalize' eCtx 
 
 -- Typechecker state holds the substitutions that we would use
 -- in order to typecheck the term and a term number that will be used
@@ -115,5 +128,3 @@ data TcState = TcState { subs :: Substitution
                        , tno  :: Int } deriving (Show, Eq)
 
 type TCM a = StateT TcState  (Either String) a
-
-

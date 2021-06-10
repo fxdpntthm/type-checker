@@ -24,34 +24,36 @@ import Control.Monad.State
 
 -- Unify is a function that tries to unify 2 types or returns an error
 -- The goal will be to convert left Type into a right Type
--- so that substitute t1 (unify (ty1, ty2)) = ty1{ty1 :-> ty2} = ty2
--- we need to update the state i.e. subs tcm and return a ()
+-- so that substitute t1 (unify (ty1, ty2)) = ty1{ty1 ~ ty2} = ty2
+-- we need to update the state i.e. subs tcm and return a substitution
 unify :: Type ->  Type -> TCM Substitution
 
 unify t1@(TArr a b) t2@(TArr c d) = do s <- unify a c
                                        s' <- unify b d
-                                       return $ substitute s s'
+                                       return $ substitute s' s
                                        
 unify (TVar a) x@(TVar b)         | (a == b) = return eSub
                                   | otherwise =  do tcs <- get
                                                     let new_s = sub a x
-                                                    modify(\tcs -> tcs {subs = subs tcs `mappend` new_s})
+                                                    modify(\tcs -> tcs {subs = substitute (subs tcs) new_s })
                                                     return new_s
-unify x1@(TVar a) x          = do if (a `elem` fvs x)
-                                    then typeError $ infiniteType x1 x
-                                    else do tcs <- get
-                                            let new_s = sub a x
-                                            modify(\tcs -> tcs {subs = subs tcs `mappend` new_s})
-                                            return new_s
+unify x1@(TVar a) x
+  | (a `elem` fvs x) =  typeError $ infiniteType x1 x
+  | otherwise =  do tcs <- get
+                    let new_s = sub a x
+                    modify(\tcs -> tcs {subs = substitute (subs tcs) new_s })
+                    return new_s
 
-unify x x1@(TVar a)          = do if (a `elem` fvs x)
-                                    then typeError $ infiniteType x x1
-                                    else do tcs <- get
-                                            let new_s = sub a x
-                                            modify(\tcs -> tcs {subs = subs tcs `mappend` new_s})
-                                            return new_s
-unify t1@(TConst a) t2@(TConst b) | (a == b)  = return eSub
-                                  | otherwise = typeError $ cannotUnify t1 t2
+unify x x1@(TVar a)
+  | (a `elem` fvs x) =  typeError $ infiniteType x1 x
+  | otherwise =  do tcs <- get
+                    let new_s = sub a x
+                    modify(\tcs -> tcs {subs = substitute (subs tcs) new_s })
+                    return new_s
+
+unify t1@(TConst a) t2@(TConst b)
+  | (a == b)  = return eSub
+  | otherwise = typeError $ cannotUnify t1 t2
 
 unify a b                   = typeError $ cannotUnify a b
 
@@ -118,15 +120,12 @@ algoM gamma (EVar x) expty = do sig <- lookupVar gamma x   -- x : σ ϵ Γ
   with extended context with substituions applied.
 
 -}
-algoM gamma (ELam x e) expty = case expty of
-                                 TVar _ -> do b <- fresh 'a'
-                                              let gamma' = updateContext gamma x (scheme b)
-                                              b' <- fresh 'a'
-                                              s' <- algoM gamma' e  b'
-                                              s'' <- unify (TArr b b') expty
-                                              return $ substitute s' s''
-                                 TArr a b -> do let gamma' = updateContext gamma x (scheme a)
-                                                algoM gamma' e b
+algoM gamma (ELam x e) expty = do b <- fresh 'a'
+                                  b' <- fresh 'a'
+                                  s <- unify expty (TArr b b')
+                                  let gamma' = updateContext (substitute s gamma) x (substitute s  (scheme b))
+                                  s' <- algoM gamma' e  (substitute s b')
+                                  return $ substitute s' s
 
 {-
    rule for application goes as follows:
@@ -148,7 +147,8 @@ algoM gamma (ELam x e) expty = case expty of
 -}
 algoM gamma (EApp e e') expty = do a <- fresh 'a'
                                    s <- algoM gamma e (TArr a expty)
-                                   algoM gamma e' $ substitute a s
+                                   s' <- algoM (substitute s gamma) e' $ substitute s a
+                                   return $ substitute s' s
 
 {-
     Let bindings introduce variable names and associated types
@@ -165,22 +165,21 @@ algoM gamma (EApp e e') expty = do a <- fresh 'a'
 -}
 algoM gamma (ELet x e e') expty = do b <- fresh 'b'
                                      s <- algoM gamma e b
-                                     sig <- generalize gamma b
-                                     let gamma' = updateContext gamma x sig
-                                     s' <- algoM gamma' e' expty
-                                     return (substitute s s')
+                                     sig <- generalize (substitute s gamma) (substitute s b)
+                                     let gamma' = updateContext (substitute s gamma) x sig
+                                     s' <- algoM gamma' e' (substitute s expty)
+                                     return $ substitute s' s
 
 algoM gamma (EIf c e1 e2) expty = do s <- algoM gamma c (TConst TBool)
-                                     let gamma' = substitute gamma s
-                                     t1 <- fresh 't'
-                                     t2 <- fresh 't'
-                                     s' <- algoM gamma' e1 t1
-                                     s'' <- algoM gamma' e2 t2
-                                     unify (substitute t2 s'') (substitute t1 s')
+                                     let gamma' = substitute s gamma
+                                     t <- fresh 't'
+                                     let t' = substitute s t 
+                                     s' <- algoM gamma' e1 (substitute s t)
+                                     s'' <- algoM gamma' e2 (substitute s t)
+                                     return $ substitute s'' s'
 
 
-algoM gamma (EFix f l@(ELam _ _)) expty = do b <- fresh 'f'
-                                             let gamma' = updateContext gamma f (scheme b)
+algoM gamma (EFix f l@(ELam _ _)) expty = do let gamma' = updateContext gamma f (scheme expty)
                                              algoM gamma' l expty
 
 algoM _ e _ = typeError $ "Cannot typecheck current expression: " ++ show e

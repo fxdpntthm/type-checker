@@ -18,7 +18,7 @@ gamma :: Context
 gamma = Context (Map.fromList [ (unique 0 "add",
                        Forall (Set.fromList ["a"])
                                   (TArr (TArr (TVar "a") (TVar "a")) (TVar "a")))
-                              , (unique 0 "id", Forall (Set.empty)
+                              , (unique 0 "id", Forall (Set.singleton "b")
                                          (TArr (TVar "b") (TVar "b")))
                      ])
 sub1 :: Substitution
@@ -31,6 +31,10 @@ factExp :: ExpPs
 factExp = EFix "fact" (ELam "n" (EIf (EApp (EVar "isZero") (EVar "n"))
                                      (ELit $ LitI 1)
                                      (EApp (EApp (EVar "mult") (EVar "n")) (EApp (EVar "fact") (EApp (EVar "dec") (EVar "n"))))))
+factExpWrong :: ExpPs
+factExpWrong = EFix "fact" (ELam "n" (EIf (EApp (EVar "isZero") (EVar "n"))
+                                     (ELit $ LitI 1)
+                                     (EApp (EApp (EVar "mult") (EVar "n")) (EApp (EVar "fact") (EApp (EVar "eq1") (EVar "n"))))))
 
 
 assert :: Bool -> IO ()

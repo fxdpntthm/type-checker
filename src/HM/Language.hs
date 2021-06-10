@@ -140,16 +140,26 @@ instance FreeVariables Type where
 -- if it is a function, apply subsitution to both sides of the arrow
 -- if it is const type, then we do not subtitute it with anything
 instance Substitutable Type where
-  substitute :: Type -> Substitution -> Type
-  substitute (TVar a)          (Subt m)     = Map.findWithDefault (TVar a) a m
-  substitute (TArr t1 t2)      s            = TArr (substitute t1 s) (substitute t2 s)
-  substitute tcon@(TConst _)   _            = tcon
+  substitute :: Substitution -> Type -> Type
+  substitute (Subt m)     (TVar a)         = Map.findWithDefault (TVar a) a m
+  substitute  s           (TArr t1 t2)     = TArr (substitute s t1) (substitute s t2)
+  substitute  _            tcon@(TConst _) = tcon
 
 -- Scheme has a universal quantifier for types
 -- Forall a, b, c TArr (TArr "a" "b") (TVar "c")
 -- ∀ a,b,c. (a -> b) -> c
 data Scheme = Forall (Set Id) Type
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show Scheme where
+  show (Forall s ty) = prefix ++ show ty
+    where prefix = if Set.null s
+                   then ""
+                   else "\\-/ " ++ showList (Set.toList s) ++ ". "
+          showList [] = ""
+          showList (x:[]) = x
+          showList (x:xs) = x ++  ", " ++ showList xs
+
 
 scheme :: Type -> Scheme
 scheme t = Forall (Set.empty) t
@@ -165,9 +175,9 @@ instance FreeVariables Scheme where
 
 -- Substitue all the free variables in the type scheme with the substitution
 instance Substitutable Scheme where
-  substitute :: Scheme -> Substitution -> Scheme
-  substitute sm@(Forall is ty) (Subt s) =
-    Forall is (substitute ty (Subt (s `Map.restrictKeys` (fvs sm))))
+  substitute :: Substitution -> Scheme -> Scheme
+  substitute (Subt s) sm@(Forall is ty) =
+    Forall is (substitute (Subt (s `Map.restrictKeys` (fvs sm))) ty)
 
 -- Q: How should we describe the substitution?
 -- A: Substitution is nothing but a map from id to a type.
@@ -176,10 +186,20 @@ instance Substitutable Scheme where
 newtype Substitution = Subt (Map.Map Id Type)
   deriving (Eq, Semigroup ,Monoid)
 
--- instance Semigroup Substitution where
---   (Subt m1) <> (Subt m2) = Subt (Map.fromList $ do )
+-- Support of a substitution is just its domain without things like (a ~ a)
+-- supp(S) = {a | Sa ≠ a}
+supp :: Substitution -> Set Id
+supp (Subt s) = Set.filter (\a -> Map.lookup a s /= Just (TVar a)) ks
+  where ks = Set.fromList $ Map.keys s
 
-
+-- Set of involved type variables itv(S) = {a | b ∈ supp(s), a ∈ {b} U ftv(Sb)} 
+itv :: Substitution -> Set Id
+itv s = Set.filter (\a -> Set.member a (f a)) bs
+  where
+    bs = supp s
+    f = \b -> Set.insert b (fvs (substitute s (TVar b)))
+  
+  
 instance Show Substitution where
   show (Subt m) = "Subst {" ++ (foldl (\a b -> b ++ ", " ++ a) "" elems) ++ "}"
     where
@@ -189,23 +209,20 @@ sub :: Id -> Type -> Substitution
 sub a t = Subt (Map.singleton a t)
 
 class Substitutable a where
-  substitute :: a -> Substitution -> a
-
-instance (Substitutable a, Substitutable b) => Substitutable (a, b) where
-  substitute :: (a, b) -> Substitution -> (a, b)
-  substitute (x, y) s = (substitute x s, substitute y s)
+  substitute :: Substitution -> a -> a
 
 consistent :: Substitution -> Substitution -> Bool
-consistent (Subt m1) (Subt m2) = all (\v -> Map.lookup v m1 == Map.lookup v m2) vs  -- hyper efficient?
-    where vs = intersect (Map.keys m1) (Map.keys m2)
+consistent s1@(Subt m1) s2@(Subt m2) = all (\v -> Map.lookup v m1 == Map.lookup v m2) vs  -- hyper efficient?
+    where vs = Set.intersection (supp s1) (supp s2)
 
--- This means subsitution is composable (obviously)
--- if  a ---> b &&  b ---> c holds
---  ==>  a ---> c holds
+-- This means subsitution is composable (if it is consistent obviously)
+-- if  a ~ b &&  b ~ c holds
+--  ==>  a ~ c holds
+-- however, a ~ Bool , a ~ Int is inconsistent and hence not composable
 instance Substitutable Substitution where
   substitute :: Substitution -> Substitution -> Substitution
   substitute s s'@(Subt m) = if consistent s s'
-                             then Subt (fmap (flip substitute s) m)
+                             then Subt (fmap (substitute s) m)
                              else error $ "Substitution is not composable for:\n\t" ++ show s ++ "\n\t" ++ show s' 
 
 data UnifyError = UnificationFailed String
@@ -230,8 +247,8 @@ instance FreeVariables Context where
 
 -- Substitute all the free variables in the context using the substitution
 instance Substitutable Context where
-  substitute :: Context -> Substitution -> Context
-  substitute (Context c) s = Context (flip (substitute) s <$> c)
+  substitute :: Substitution -> Context -> Context
+  substitute s (Context c) = Context ((substitute s) <$> c)
 
 -- extend the context by adding an (id, scheme) pair
 updateContext :: Context -> Unique -> Scheme -> Context
