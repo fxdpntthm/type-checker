@@ -16,5 +16,5 @@ runPipelineW e = do (fe, _) <- runStateT (freshen e) initFnS
                     -- traceM $ show fe
                     return (fst te)
   
-runPipelineM e ty= do (fe, _) <- runStateT (freshen e) initFnS
-                      runStateT (algoM globalCtx fe ty) initTcS
+runPipelineM e ty = do (fe, _) <- runStateT (freshen e) initFnS
+                       runStateT (algoM globalCtx fe ty) initTcS

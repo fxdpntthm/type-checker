@@ -37,7 +37,6 @@ data Exp pass =
   | ELet (EId pass) (Exp pass) (Exp pass)   -- Let x = e in e'
   | EFix (EId pass) (Exp pass)              -- letrec f \x. e
   | EIf (Exp pass) (Exp pass) (Exp pass)
---  deriving (Show, Eq, Ord)
 
 data Lit = LitB Bool                  -- Literals for Bool
          | LitI Int                   -- Literals for Integer
@@ -69,7 +68,7 @@ data Unique = Unique { value :: String, hash :: Int, scope :: Int }
 instance Eq Unique where
   u1 == u2 = hash u1 == hash u2
 instance Show Unique where
-  show (Unique {value = v, scope = s}) = v ++ "`" ++ show s
+  show (Unique {value = v}) = v
 instance Ord Unique where
   u1 <= u2 = hash u1 <= hash u2
 
@@ -175,12 +174,16 @@ instance Substitutable Scheme where
 --    It is a process of replacing type of one term with another type
 --    It will be used in specializing type variables in our typechecking algorithm
 newtype Substitution = Subt (Map.Map Id Type)
-  deriving (Eq, Semigroup, Monoid)
+  deriving (Eq, Semigroup ,Monoid)
+
+-- instance Semigroup Substitution where
+--   (Subt m1) <> (Subt m2) = Subt (Map.fromList $ do )
+
 
 instance Show Substitution where
-  show (Subt m) = "\nSubst {" ++ (foldr (\b n -> b ++ "\n" ++ n) "" elems) ++ "}"
+  show (Subt m) = "Subst {" ++ (foldl (\a b -> b ++ ", " ++ a) "" elems) ++ "}"
     where
-    elems = fmap (\(i, t) -> "(" ++ i ++ ":->" ++ show t ++ ")") (Map.toList m)
+    elems = fmap (\(i, t) -> "(" ++ i ++ " ~ " ++ show t ++ ")") (Map.toList m)
 
 sub :: Id -> Type -> Substitution
 sub a t = Subt (Map.singleton a t)

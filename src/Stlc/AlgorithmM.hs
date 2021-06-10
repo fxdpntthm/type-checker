@@ -20,43 +20,35 @@ module Stlc.AlgorithmM where
 import Stlc.Language
 import Stlc.Util
 
-
-import qualified Data.Map as Map
-import Data.Map (Map)
-
-import Control.Monad (liftM2)
 import Control.Monad.State
 
 -- Unify is a function that tries to unify 2 types or returns an error
 -- The goal will be to convert left Type into a right Type
--- so that substitute t1 (unify (ty1, ty2)) = {ty1 :-> ty2}
+-- so that substitute t1 (unify (ty1, ty2)) = ty1{ty1 :-> ty2} = ty2
 -- we need to update the state i.e. subs tcm and return a ()
 unify :: Type ->  Type -> TCM Substitution
 
 unify t1@(TArr a b) t2@(TArr c d) = do s <- unify a c
-                                       s'<- unify (substitute b s) (substitute d s)
-                                       return s'
+                                       s' <- unify b d
+                                       return $ substitute s s'
                                        
 unify (TVar a) x@(TVar b)         | (a == b) = return eSub
                                   | otherwise =  do tcs <- get
                                                     let new_s = sub a x
-                                                    let tcs' = tcs {subs = subs tcs `mappend` new_s}
-                                                    put tcs'
+                                                    modify(\tcs -> tcs {subs = subs tcs `mappend` new_s})
                                                     return new_s
 unify x1@(TVar a) x          = do if (a `elem` fvs x)
                                     then typeError $ infiniteType x1 x
                                     else do tcs <- get
                                             let new_s = sub a x
-                                            let tcs' = tcs {subs = subs tcs `mappend` new_s}
-                                            put tcs'
+                                            modify(\tcs -> tcs {subs = subs tcs `mappend` new_s})
                                             return new_s
 
 unify x x1@(TVar a)          = do if (a `elem` fvs x)
                                     then typeError $ infiniteType x x1
                                     else do tcs <- get
                                             let new_s = sub a x
-                                            let tcs' = tcs {subs = subs tcs `mappend` new_s}
-                                            put tcs'
+                                            modify(\tcs -> tcs {subs = subs tcs `mappend` new_s})
                                             return new_s
 unify t1@(TConst a) t2@(TConst b) | (a == b)  = return eSub
                                   | otherwise = typeError $ cannotUnify t1 t2
@@ -96,8 +88,8 @@ algoM :: Context -> ExpFn -> Type -> TCM Substitution
   unify is called here so as to fix the type of the literal
 -}
 algoM gamma (ELit x) expty = case x of
-  LitB _ -> unify (TConst TBool) expty
-  LitI _ -> unify (TConst TInt) expty
+  LitB _ -> unify expty (TConst TBool) 
+  LitI _ -> unify expty (TConst TInt) 
 
 {-
    The second rule is for the variable
@@ -112,7 +104,7 @@ algoM gamma (ELit x) expty = case x of
 -}
 algoM gamma (EVar x) expty = do sig <- lookupVar gamma x   -- x : σ ϵ Γ
                                 tau <- instantiate sig     -- τ = inst(σ)
-                                unify tau expty            -- τ
+                                unify expty tau            -- τ
 
 {-
   This rule types lambda expression.
@@ -126,12 +118,15 @@ algoM gamma (EVar x) expty = do sig <- lookupVar gamma x   -- x : σ ϵ Γ
   with extended context with substituions applied.
 
 -}
-algoM gamma (ELam x e) expty = do b1 <- fresh 'x'
-                                  b2 <- fresh 'e'
-                                  let gamma' = updateContext gamma x (scheme b1)
-                                  s' <- algoM gamma' e b2
-                                  s  <- unify (TArr b1 b2) expty
-                                  return (substitute s s')
+algoM gamma (ELam x e) expty = case expty of
+                                 TVar _ -> do b <- fresh 'a'
+                                              let gamma' = updateContext gamma x (scheme b)
+                                              b' <- fresh 'a'
+                                              s' <- algoM gamma' e  b'
+                                              s'' <- unify (TArr b b') expty
+                                              return $ substitute s' s''
+                                 TArr a b -> do let gamma' = updateContext gamma x (scheme a)
+                                                algoM gamma' e b
 
 {-
    rule for application goes as follows:
@@ -147,14 +142,13 @@ algoM gamma (ELam x e) expty = do b1 <- fresh 'x'
 
 
   The interesting bit here is we have to introduce a new
-  type variable as the return type of the first expression.
-  Then e is checked against the TArr b expected type
+  type variable as the return type of the second expression (e')
+  Then e is checked against type (a -> expty)
   to obtain a substitution for b. Then e' is checked for sanity
 -}
-algoM gamma (EApp e e') expty = do b <- fresh 'e'
-                                   s <- algoM gamma e (TArr b expty)
-                                   s' <- algoM gamma e' b
-                                   return (substitute s s')
+algoM gamma (EApp e e') expty = do a <- fresh 'a'
+                                   s <- algoM gamma e (TArr a expty)
+                                   algoM gamma e' $ substitute a s
 
 {-
     Let bindings introduce variable names and associated types
@@ -175,6 +169,15 @@ algoM gamma (ELet x e e') expty = do b <- fresh 'b'
                                      let gamma' = updateContext gamma x sig
                                      s' <- algoM gamma' e' expty
                                      return (substitute s s')
+
+algoM gamma (EIf c e1 e2) expty = do s <- algoM gamma c (TConst TBool)
+                                     let gamma' = substitute gamma s
+                                     t1 <- fresh 't'
+                                     t2 <- fresh 't'
+                                     s' <- algoM gamma' e1 t1
+                                     s'' <- algoM gamma' e2 t2
+                                     unify (substitute t2 s'') (substitute t1 s')
+
 
 algoM gamma (EFix f l@(ELam _ _)) expty = do b <- fresh 'f'
                                              let gamma' = updateContext gamma f (scheme b)

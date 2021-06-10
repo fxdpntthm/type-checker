@@ -1,3 +1,5 @@
+{-# Language ScopedTypeVariables#-}
+
 module Main where
 
 import Stlc.Language
@@ -9,76 +11,78 @@ import Stlc.Driver
 
 import Data.Map as Map
 import Data.Set as Set
+import Data.Either (isRight, isLeft)
+import Common
 
-
-scheme1 :: Scheme
-scheme1 = Forall (Set.fromList ["b"]) (TArr (TVar "a") (TVar "b"))
-
-gamma :: Context
-gamma = Context (Map.fromList [ (unique 0 "add",
-                       Forall (Set.fromList ["a"])
-                                  (TArr (TArr (TVar "a") (TVar "a")) (TVar "a")))
-                              , (unique 0 "id", Forall (Set.empty)
-                                         (TArr (TVar "b") (TVar "b")))
-                     ])
-sub1 :: Substitution
-sub1 = Subt (Map.singleton "a" (TVar "b"))
-
-sub2 :: Substitution
-sub2 = Subt (Map.singleton "b" (TVar "c"))
-
-factExp :: ExpPs
-factExp = EFix "fact" (ELam "n" (EIf (EApp (EVar "isZero") (EVar "n"))
-                                     (ELit $ LitI 1)
-                                     (EApp (EApp (EVar "mult") (EVar "n")) (EApp (EVar "fact") (EApp (EVar "dec") (EVar "n"))))))
 
 main :: IO ()
 main = do
   putStrLn $ show $ substitute sub1 sub2
 
-  putStr $ "+ should succeed:\n\t"
-  putStrLn $ show $ (execStateT $ (unify (TConst TBool) (TConst TBool))) (TcState mempty 0)
-  putStr $ "+ should fail:\n\t"
-  putStrLn $ show $ (execStateT $ (unify (TConst TBool) (TArr (TVar "a") (TVar "b")))) (TcState mempty 0)
-  putStr $ "+ should fail:\n\t"
-  putStrLn $ show $ (execStateT $ (unify (TVar "a") (TArr (TVar "a") (TVar "b")))) (TcState mempty 0)
-  putStr $ "+ should succeed:\n\t"
-  putStrLn $ show $ (execStateT $ (unify (TArr (TVar "a") (TVar "b"))
-                                     (TArr (TVar "a") (TVar "b"))))
-                              (TcState mempty 0)
-  putStr $ "+ should succeed:\n\t"
-  putStrLn $ show $ (execStateT $ (unify (TVar "a")
-                                     (TArr (TVar "b") (TVar "c"))))
-                            (TcState mempty 0)
+  putStr $ "+ should succeed: Bool ~ Bool\n\t"
+  let v = (execStateT $ (unify (TConst TBool) (TConst TBool))) (TcState mempty 0)
+  shouldPass v
+  
+  putStr $ "+ should fail: Bool ~ a -> b\n\t"
+  let v = (execStateT $ (unify (TConst TBool) (TArr (TVar "a") (TVar "b")))) (TcState mempty 0)
+  shouldFail v
+
+  putStr $ "+ should fail: a ~ a -> b\n\t"
+  let v = (execStateT $ (unify (TVar "a") (TArr (TVar "a") (TVar "b")))) (TcState mempty 0)
+  shouldFail v
+  
+  putStr $ "+ should succeed: a -> b ~ a -> b\n\t"
+  let v = (execStateT $ (unify (TArr (TVar "a") (TVar "b"))
+                               (TArr (TVar "a") (TVar "b"))))
+          (TcState mempty 0)
+  shouldPass v
+  
+  putStr $ "+ should succeed: a ~ b -> c \n\t"
+  let v = (execStateT $ (unify (TVar "a")
+                               (TArr (TVar "b") (TVar "c"))))
+          (TcState mempty 0)
+  shouldPass v
+  
   putStrLn $ "+ should fail:\n\t -- (y: Bool) |- x"
-  putStrLn $ show $ (execStateT $ algoW (Context $ Map.singleton (unique 0 "y") (Forall (Set.fromList []) $ TConst TBool))
+  let v = (execStateT $ algoW (Context $ Map.singleton (unique 0 "y") (Forall (Set.fromList []) $ TConst TBool))
                       (EVar $ unique 0 "x")) initTcS
+  shouldFail v
+  
   putStrLn $ "+ should succeed:\n\t -- (x: Bool) |- x"
-  putStrLn $ show $ (execStateT $ algoW (Context $ Map.singleton (unique 0 "x") (Forall (Set.fromList []) $ TConst TBool))
+  let v = (execStateT $ algoW (Context $ Map.singleton (unique 0 "x") (Forall (Set.fromList []) $ TConst TBool))
                       (EVar $ unique 0 "x")) initTcS
+  shouldPass v
+  
   putStrLn $ "+ should succeed:\n\t -- () |- \\x. Bool"
-  putStrLn $ show $ (execStateT $ algoW mempty (ELam (unique 0 "x") (ELit $ LitB True))) initTcS
+  let v = (execStateT $ algoW mempty (ELam (unique 0 "x") (ELit $ LitB True))) initTcS
+  shouldPass v
+  
   putStrLn $ "+ should succeed:\n\t -- () |- \\x. \\y. True"
-  putStrLn $ show $ (do (fe, _) <- (runStateT (freshen (ELam "x" (ELam "y" $ ELit $ LitB True)))) initFnS
-                        (te, _) <- (runStateT $ algoW mempty fe) initTcS
-                        return $ fst te)
+  let v = runPipelineW (ELam "x" (ELam "y" $ ELit $ LitB True))
+  shouldPass v
+  
   putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x) (False)"
-  putStrLn $ show $ runPipelineW (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
-
+  let v = runPipelineW (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
+  shouldPass v
+  
   putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x)"
-  putStrLn $ show $ runPipelineW (ELam "x" (EVar "x"))
-
+  let v = runPipelineW (ELam "x" (EVar "x"))
+  shouldPass v
+  
   putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x) (\\y. y)"
-  putStrLn $ show $ runPipelineW (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
-
+  let v =  runPipelineW (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
+  shouldPass v
+  
   putStrLn $ "+ should fail:\n\t -- () |- ((\\x. x) (False))(\\x.x)"
-  putStrLn $ show $ runPipelineW (EApp (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
+  let v = runPipelineW (EApp (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
                                  (ELam "x" (EVar "x")))
+  shouldFail v
     
   putStrLn $ "+ should succeed:\n\t -- () |- let id = \\x.x in (id False)"
-  putStrLn $ show $ runPipelineW (ELet "id" (ELam "x" (EVar "x"))
+  let v = runPipelineW (ELet "id" (ELam "x" (EVar "x"))
                                  (EApp (EVar "id") (ELit $ LitB False)))
-
+  shouldPass v
+  
   putStrLn $ "+ should succeed:\n\t -- (id: \\/ a. a -> a) |- Fix id \\x. id True"
-  putStrLn $ show $ runPipelineW factExp
-
+  let v = runPipelineW factExp
+  shouldPass v

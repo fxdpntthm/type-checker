@@ -29,59 +29,35 @@ module Stlc.AlgorithmW where
 import Stlc.Language
 import Stlc.Util
 
-import Control.Applicative (liftA2)
-import Control.Monad (liftM2)
 import Control.Monad.State
-import qualified Data.Map as Map
-import Data.Map (Map)
-import qualified Data.Set as Set
-import Data.Set (Set)
 
-import Debug.Trace (traceM)
 
 -- Unify is a function that tries to unify 2 types or returns an error
 -- The goal will be to convert left Type into a right Type
 -- so that substitute t1 (unify (ty1, ty2)) = ty2 if unify returns a Right _
 -- we need to update the state i.e. subs tcm and return a ()
 unify :: Type ->  Type -> TCM ()
-unify t1@(TArr a b) t2@(TArr c d) = StateT (\tcs -> do -- traceM ("DEBUG (unify t1 t2)\n\t" ++ show t1 ++ "\n\t" ++ show t2)
-                                                    tcs' <- (execStateT $ unify a c) tcs
-                                                    -- traceM ("DEBUG (unify a c): " ++  show tcs')
-                                                    let s = subs tcs'
-                                                    tcs'' <- (execStateT $ unify (substitute b s) (substitute d s)) tcs'
-                                                    -- traceM ("DEBUG (unify b d): " ++  show tcs'')
-                                                    return ((), tcs'')
-                                        )
-unify (TVar a) x@(TVar b)         | (a == b) = return ()
-                                  | otherwise =  StateT (\tcs ->
-                                                        return (()
-                                                               , tcs {subs = (subs tcs) `mappend` (sub a x)}))
-unify (TVar a) x          = do if (a `elem` fvs x)
-                               then typeError
-                                    $ "unification of "
-                                    ++ (show a) ++ " and " ++ (show x)
-                                    ++ " will lead to infinite type"
-                               else StateT (\tcs ->
-                                            return (()
-                                                   ,tcs {subs = (subs tcs) `mappend` (sub a x)}))
-unify x (TVar a)          = do if (a `elem` fvs x)
-                               then typeError
-                                    $ "unification of "
-                                    ++ (show a) ++ " and " ++ (show x)
-                                    ++ " will lead to infinite type"
-                               else StateT (\tcs ->
-                                            return (()
-                                                   ,tcs {subs = (subs tcs) `mappend` (sub a x)}))
-unify (TConst a) (TConst b) | (a == b)  = return ()
-                            | otherwise = typeError
-                                $ "Cannot unify "
-                                  ++ (show a) ++ " and " ++ (show b)
-unify (TConst a)  b         = typeError
-                             $ "Cannot unify " ++ (show a)
-                                ++ " with " ++ show b
+unify t1@(TArr a b) t2@(TArr c d) = do unify a c
+                                       unify c d
 
-unify a b                   = typeError $ "Cannot unify "
-                                ++ (show a) ++ " and " ++ (show b)
+unify (TVar a) x@(TVar b)         | (a == b) = return ()
+                                  | otherwise =  do modify (\tcs -> tcs {subs = subs tcs `mappend` (sub a x)})
+unify x1@(TVar a) x          = do if (a `elem` fvs x)
+                                    then typeError $ infiniteType x1 x
+                                    else do modify (\tcs -> tcs {subs = subs tcs `mappend` (sub a x)})
+unify x x1@(TVar a)          = do if (a `elem` fvs x)
+                                    then typeError $ infiniteType x x1
+                                    else do modify (\tcs -> tcs {subs = subs tcs `mappend` (sub a x)})
+unify t1@(TConst a) t2@(TConst b) | (a == b)  = return ()
+                            | otherwise = typeError $ cannotUnify t1 t2
+unify t1@(TConst a)  b      = typeError $ cannotUnify t1 b
+
+unify a b                   = typeError $ cannotUnify a b
+
+infiniteType t1 t2 = "unification of "
+                     ++ show t1 ++ " and " ++ show t2
+                     ++ " will lead to infinite type"
+cannotUnify t1 t2 = "Cannot unify " ++ (show t1) ++ " and " ++ (show t2)
 
 
 
@@ -158,15 +134,12 @@ algoW gamma (ELam x e) = do x' <- fresh 'x'                             -- x:T
   type variable as the return type of the first expression
   and then fire unify to ensure the complete expression is well typed
 -}
-algoW gamma (EApp e e') = do (ty, s)  <- algoW gamma e         -- Γ ⊢ e : T -> T'
-                             -- traceM ("e: " ++ show ty)
+algoW gamma (EApp e e') = do (ty, s)  <- algoW gamma e                         -- Γ ⊢ e : T -> T'
                              (ty', s') <- algoW (substitute gamma s) e'        -- Γ ⊢ e' :T
-                             -- traceM ("e': " ++ show ty')
                              f <- fresh 'f'
                              unify (substitute ty s') (TArr ty' f)
                              s'' <- get
                              let subst = subs s''
-                             -- traceM ("e e': " ++ show f)
                              return $ ((substitute f subst), (subst `mappend` s' `mappend` s))
 
 
@@ -186,9 +159,8 @@ algoW gamma (EApp e e') = do (ty, s)  <- algoW gamma e         -- Γ ⊢ e : T -
 
 -}
 algoW gamma (ELet n e e') = do (ty, s) <- algoW gamma e                  -- Γ ⊢ e : T
-                               -- let gamma' = substitute gamma s
                                sig <- generalize gamma ty
-                               let gamma'' = updateContext gamma n sig  -- Γ, n: sig
+                               let gamma'' = updateContext gamma n sig   -- Γ, n: sig
                                (ty', s') <- algoW gamma'' e'             -- Γ, x: sig ⊢ e' :T'
                                return (ty', s `mappend` s')
 
