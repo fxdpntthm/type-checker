@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
 
-module Stlc.AlgorithmM where
+module HM.AlgorithmM where
 
 -- This is a context-sensitive top-down approach to type checking
 -- The pros are that:
@@ -17,8 +17,8 @@ module Stlc.AlgorithmM where
 --        https://dl.acm.org/citation.cfm?id=291892
 
 
-import Stlc.Language
-import Stlc.Util
+import HM.Language
+import HM.Util
 
 import Control.Monad.State
 

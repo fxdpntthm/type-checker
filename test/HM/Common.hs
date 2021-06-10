@@ -1,11 +1,11 @@
 module Common where
 
-import Stlc.Language
-import Stlc.AlgorithmW
-import Stlc.Util
-import Stlc.Freshen
+import HM.Language
+import HM.AlgorithmW
+import HM.Util
+import HM.Freshen
 import Control.Monad.State
-import Stlc.Driver
+import HM.Driver
 
 import Data.Map as Map
 import Data.Set as Set

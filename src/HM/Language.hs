@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds, PolyKinds #-}
 
-module Stlc.Language where
+module HM.Language where
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set

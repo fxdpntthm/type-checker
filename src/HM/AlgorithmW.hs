@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE InstanceSigs #-}
 
-module Stlc.AlgorithmW where
+module HM.AlgorithmW where
 
 -- This is a context-insensitive bottom-up approch to type checking
 -- The pros are:
@@ -26,8 +26,8 @@ module Stlc.AlgorithmW where
 -- 4. Proofs about a folklore let-polymorphic type inference algorithm
 --    https://dl.acm.org/citation.cfm?id=291892
 
-import Stlc.Language
-import Stlc.Util
+import HM.Language
+import HM.Util
 
 import Control.Monad.State
 

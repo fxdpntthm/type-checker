@@ -1,7 +1,7 @@
-module Stlc.Freshen where
+module HM.Freshen where
 
-import Stlc.Language
-import Stlc.Util
+import HM.Language
+import HM.Util
 import Control.Monad.State
 import Debug.Trace
 

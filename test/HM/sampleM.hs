@@ -1,10 +1,10 @@
 module Main where
 
-import Stlc.Language
-import Stlc.AlgorithmM
-import Stlc.Util
-import Stlc.Freshen
-import Stlc.Driver
+import HM.Language
+import HM.AlgorithmM
+import HM.Util
+import HM.Freshen
+import HM.Driver
 
 import Data.Map as Map
 import Data.Set as Set
