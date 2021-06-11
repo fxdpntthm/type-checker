@@ -170,12 +170,11 @@ algoM gamma (ELet x e e') expty = do b <- fresh 'b'
                                      s' <- algoM gamma' e' (substitute s expty)
                                      return $ substitute s' s
 
-algoM gamma (EIf c e1 e2) expty = do s <- algoM gamma c (TConst TBool)
+algoM gamma (EIf c e1 e2) expty = do t <- fresh 't'
+                                     s <- algoM gamma e1 t
                                      let gamma' = substitute s gamma
-                                     t <- fresh 't'
-                                     let t' = substitute s t 
-                                     s' <- algoM gamma' e1 (substitute s t)
-                                     s'' <- algoM gamma' e2 (substitute s t)
+                                     s' <- algoM gamma' e2 (substitute s t)
+                                     s'' <- algoM gamma' c (TConst TBool)
                                      return $ substitute s'' s'
 
 

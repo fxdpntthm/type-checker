@@ -52,11 +52,11 @@ mkUnique = unique 0
 
 isZero = mkUnique "isZero"
 mult = mkUnique "mult"
-dec = mkUnique "dec"
-eq1 = mkUnique "eq1"
+minus = mkUnique "-"
+eq = mkUnique "="
 
 globals :: [Unique]
-globals = [ isZero, mult, dec, eq1]
+globals = [ isZero, mult, minus, eq]
 
 initFnS = FnS {seed = 0, table = Map.fromList (fmap (\u -> (value u, u)) globals)}
 
@@ -86,16 +86,16 @@ lookupVar (Context c) i = case (Map.lookup i c) of
 -- ie. takes all the quantified variables creates new type variables for them
 -- and applies all of them to the type
 instantiate :: Scheme -> TCM Type
-instantiate (Forall q ty) = do q' <- mapM (const $ fresh 't') (Set.toList $ q)
-                               let s = Subt (Map.fromList $ zip (Set.toList q) q')
-                               return (substitute s ty)
+instantiate (Forall qs ty) = do fqs <- mapM (const $ fresh 't') qs'
+                                let s = Subt (Map.fromList $ zip qs' fqs)
+                                return (substitute s ty)
+                                  where qs' = Set.toList qs
 
 -- creates a scheme given a context and a type
 -- the free variables in the generated scheme
 -- are the (free variables in the type) - (free variables in context)
 generalize :: Context -> Type -> TCM Scheme
-generalize gamma ty = return $ Forall qs ty
-  where qs = fvs ty \\ fvs gamma
+generalize gamma ty = return $ generalize' gamma ty
 
 generalize' :: Context -> Type -> Scheme
 generalize' gamma ty = Forall qs ty
@@ -104,18 +104,22 @@ generalize' gamma ty = Forall qs ty
 
 -- Generate unique type variable for a new term
 fresh :: Char -> TCM Type
-fresh c = StateT (\(TcState s i) -> return (TVar (c:'`':(suffixGen !! i))
-                                           , TcState s (i + 1)))
+fresh c = do tcs <- get
+             modify incTno
+             return $ TVar (c:'`': (suffixGen !! (tno tcs)))
   where
-    suffixGen = liftA2 (\i -> \pre -> [pre] ++ show i)  [ (1::Integer) .. ]  ['a' .. 'z']
+    suffixGen = liftA2 (\i -> \pre -> [pre] ++ show i)  [ (1::Int) .. ]  ['a' .. 'z']
+
+incTno :: TcState -> TcState
+incTno (TcState {subs = s, tno = t}) = TcState {subs = s, tno = t + 1}
 
 initTcS = TcState { subs = mempty, tno = 0 }
 
 
 globalCtx = Context $ Map.fromList [ (isZero, scheme (TArr (TConst TInt) (TConst TBool)))
                                    , (mult, scheme (TArr (TConst TInt) (TArr (TConst TInt) (TConst TInt))))
-                                   , (dec, scheme (TArr (TConst TInt) (TConst TInt)))
-                                   , (eq1, scheme ((TConst TInt) `TArr` (TConst TBool)))]
+                                   , (minus, scheme (TArr (TConst TInt) (TArr (TConst TInt) (TConst TInt))))
+                                   , (eq, Forall (Set.fromList ["a"]) ((TVar "a") `TArr` ((TVar "a") `TArr` (TConst TBool))))]
 
 -- after the inference is done, we get a type, but we'd like to generalize that to a scheme
 tidyType :: Type -> Scheme

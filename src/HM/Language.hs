@@ -212,19 +212,28 @@ class Substitutable a where
   substitute :: Substitution -> a -> a
 
 consistent :: Substitution -> Substitution -> Bool
-consistent s1@(Subt m1) s2@(Subt m2) = all (\v -> Map.lookup v m1 == Map.lookup v m2) vs  -- hyper efficient?
+consistent s1@(Subt m1) s2@(Subt m2) = all (\v -> composable (Map.lookup v m1)  (Map.lookup v m2)) vs  -- hyper efficient?
     where vs = Set.intersection (supp s1) (supp s2)
-
+          composable :: Maybe Type -> Maybe Type -> Bool
+          composable (Just (TConst TInt)) (Just (TConst TBool)) = False
+          composable (Just (TConst TBool)) (Just (TConst TInt)) = False
+          
+          composable _  _ = True
+          
 -- This means subsitution is composable (if it is consistent obviously)
 -- if  a ~ b &&  b ~ c holds
 --  ==>  a ~ c holds
 -- however, a ~ Bool , a ~ Int is inconsistent and hence not composable
+-- a ~ b && c ~ d should return {a ~ b, c ~ d}
 instance Substitutable Substitution where
   substitute :: Substitution -> Substitution -> Substitution
-  substitute s s'@(Subt m) = if consistent s s'
-                             then Subt (fmap (substitute s) m)
-                             else error $ "Substitution is not composable for:\n\t" ++ show s ++ "\n\t" ++ show s' 
-
+  substitute s@(Subt m) s'@(Subt m') =
+    if consistent s s'
+    then Subt ((Map.restrictKeys m (ks Set.\\ ks')) `Map.union` fmap (substitute s) m')
+    else error $ "Substitution is not composable for:\n\t" ++ show s ++ "\n\t" ++ show s' 
+    where ks = supp s
+          ks' = supp s'
+        
 data UnifyError = UnificationFailed String
   deriving (Show, Eq)
 

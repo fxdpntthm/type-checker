@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
 import HM.Language
@@ -69,87 +70,120 @@ main = do
                             initTcS
   shouldPass v
 
-  putStr $ "+ should succeed:\n\t -- |- \\ x. True <= (a -> Bool)\n\t"
-  let v =  runPipelineMCheck (ELam "x" (ELit $ LitB True)) (TArr (TVar "a") (TConst TBool))
+  let e::ExpPs = (ELam "x" (ELit $ LitB True))
+  let ty = (TArr (TVar "a") (TConst TBool))
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e ++ " <= " ++ show ty
+  let v =  runPipelineMCheck e ty
+  putStr "\t"
   shouldPass v
   
-  -- putStr $ "+ should succeed:\n\t -- |- \\ x. True\n\t"
-  -- let v =  runPipelineMInfer  (ELam "x" (ELit $ LitB True))
-  -- shouldPass v
-  
-  -- putStr $ "+ should succeed:\n\t |- (\\x. \\y. True)\n\t" 
-  -- let v =  runPipelineMInfer (ELam "x" (ELam "y" $ ELit $ LitB True))
-  -- shouldPass v
-
-  -- putStr $ "+ should succeed:\n\t |- (\\x.x)\n\t"
-  -- let v = runPipelineMInfer (ELam "x" (EVar "x"))
-  -- shouldPass v
-
-  -- putStr $ "+ should fail:\n\t |- (\\x.x x)\n\t"
-  -- let v = runPipelineMInfer (ELam "x" $ EApp (EVar "x") (EVar "x"))
-  -- shouldFail v
-
-  -- putStr $ "+ should succeed:\n\t |- True \n\t"
-  -- let v = runPipelineMInfer (ELit $ LitB True)
-  -- shouldPass v
-
-  -- putStr $ "+ should succeed:\n\t |- (\\x.x) False\n\t"
-  -- let v = runPipelineMInfer (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
-  -- shouldPass v
-
-  putStr $ "+ should succeed:\n\t |- (\\x.x) False <= Bool \n\t"
-  let v = runPipelineMCheck (EApp (ELam "x" (EVar "x")) (ELit $ LitB False)) (TConst TBool)
+  let e::ExpPs = (ELam "x" (ELit $ LitB True))
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
+  let v =  runPipelineMInfer e
+  putStr "\t"
   shouldPass v
 
-  putStr $ "+ should succeed:\n\t -- |- (\\x.x) (\\y.y) <= (a -> a)\n\t"
-  let v =  runPipelineMCheck (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y"))) (TArr (TVar "a") (TVar "a"))
+  let e::ExpPs = (ELam "x" (ELam "y" $ ELit $ LitB True))
+  putStrLn $ "+ should succeed:\n\t |- (\\x. \\y. True)" 
+  let v =  runPipelineMInfer e
+  putStr "\t"
   shouldPass v
 
-  -- putStr $ "+ should succeed:\n\t -- |- (\\x.x) (\\y.y)\n\t"
-  -- let v =  runPipelineMInfer (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
-  -- shouldPass v
-
-  
-  -- putStr $ "+ should fail:\n\t -- |- False (\\x.x)\n\t"
-  -- let v =  runPipelineMInfer
-  --                    (EApp (ELit $ LitB False)
-  --                          (ELam "x" (EVar "x")))
-  -- shouldFail v
-
-
-  -- putStr $ "+ should fail:\n\t -- |- ((\\x.x)(False)) (\\x.x)\n\t"
-  -- let v =  runPipelineMInfer
-  --                    (EApp (EApp (ELam "x" (EVar "x"))
-  --                                (ELit $ LitB False))
-  --                          (ELam "x" (EVar "x")))
-  -- shouldFail v
-
-  -- putStr $ "+ should succeed:\n\t -- (let id = \\x -> x in (id False))\n\t"
-  -- let v =  runPipelineMInfer
-  --                    (ELet "id" (ELam "x" (EVar "x"))
-  --                      (EApp (EVar "id") (ELit $ LitB False)))
-  -- shouldPass v
-
-  -- putStr $ "+ should succeed:\n\t -- letrec f = \\ x -> if x = 0 then 1 else x * (fact x-1) \n\t"
-  -- let v =  runPipelineMInfer factExp
-  -- shouldPass v
-
-  putStr $ "+ should succeed:\n\t -- letrec f = \\ x -> if x = 0 then 1 else x * (fact x-1) <= Int -> Int\n\t"
-  let v =  runPipelineMCheck factExp (TArr (TConst TInt) (TConst TInt))
+  let e::ExpPs = (ELam "x" (EVar "x"))
+  putStrLn $ "+ should succeed: |- " ++ show e
+  let v = runPipelineMInfer e
+  putStr "\t"
   shouldPass v
 
-  putStr $ "+ should fail:\n\t -- letrec f = \\ x -> if x = 0 then 1 else x * (fact x=1) <= Int -> Int\n\t"
-  let v =  runPipelineMCheck factExpWrong (TArr (TConst TInt) (TConst TInt))
+  let e::ExpPs = (ELam "x" $ EApp (EVar "x") (EVar "x"))
+  putStrLn $ "+ should fail: () |- " ++  show e
+  let v = runPipelineMInfer e
+  putStr "\t"
   shouldFail v
 
-  -- putStr $ "+ should succeed:\n\t -- letrec f = \\ x -> if x = 0 then 1 else x * (fact x-1) <= a -> a\n\t"
-  -- let v =  runPipelineMCheck factExp (TArr (TVar "a") (TVar "a"))
-  -- shouldPass v
+  let e::ExpPs =(ELit $ LitB True)
+  putStrLn $ "+ should succeed: |- " ++ show e
+  let v = runPipelineMInfer e
+  putStr "\t"
+  shouldPass v
 
-  -- putStr $ "+ should succeed:\n\t -- (let id = \\x -> x in (id id))\n\t"
-  -- let v =  runPipelineMInfer
-  --                    (ELet "id" (ELam "x" (EVar "x"))
-  --                      (EApp (EVar "id") (EVar "id")))
-  -- shouldPass v
+  let e::ExpPs = (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
+  putStrLn $ "+ should succeed: |- " ++ show e
+  let v = runPipelineMInfer e
+  putStr "\t"
+  shouldPass v
+
+  let e::ExpPs = (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
+  let ty = (TConst TBool)
+  putStrLn $ "+ should succeed: |- " ++ show e ++ " <= " ++ show ty
+  let v = runPipelineMCheck e ty
+  putStr "\t"
+  shouldPass v
+
+  let e::ExpPs = (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
+  let ty = (TArr (TVar "a") (TVar "a"))
+  putStrLn $ "+ should succeed: -- () |- " ++ show e ++ " <= " ++ show ty
+  let v =  runPipelineMCheck e ty
+  putStr "\t"
+  shouldPass v
+
+  let e::ExpPs = (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
+  putStrLn $ "+ should succeed: -- () |- " ++ show e
+  let v =  runPipelineMInfer e
+  putStr "\t"
+  shouldPass v
+
+  let e::ExpPs = (EApp (ELit $ LitB False)
+                           (ELam "x" (EVar "x")))
+  putStrLn $ "+ should fail: -- () |- " ++ show e
+  let v =  runPipelineMInfer e
+  putStr "\t"
+  shouldFail v
+
+  let e::ExpPs = (EApp (EApp (ELam "x" (EVar "x"))
+                         (ELit $ LitB False))
+                   (ELam "x" (EVar "x")))
+  putStrLn $ "+ should fail: -- () |- " ++ show e
+  let v =  runPipelineMInfer e
+  putStr "\t"
+  shouldFail v
+
+  let e::ExpPs = (ELet "id" (ELam "x" (EVar "x"))
+                       (EApp (EVar "id") (ELit $ LitB False)))
+  putStrLn $ "+ should succeed: -- () |- " ++ show e
+  let v =  runPipelineMInfer e
+  putStr "\t"
+  shouldPass v
+
+  putStrLn $ "+ should succeed: -- () |- " ++ show factExp
+  let v =  runPipelineMInfer factExp
+  putStr "\t"
+  shouldPass v
+
+  let ty = (TArr (TConst TInt) (TConst TInt))
+  putStrLn $ "+ should succeed: -- () |- " ++ show factExp ++ " <= " ++ show ty
+  let v =  runPipelineMCheck factExp ty
+  putStr "\t"
+  shouldPass v
+
+
+  let ty = (TArr (TConst TInt) (TConst TInt))
+  putStrLn $ "+ should fail: -- () |- " ++ show factExpWrong ++ " <= " ++ show ty
+  let v =  runPipelineMCheck factExpWrong ty
+  putStr "\t"
+  shouldFail v
+
+  let ty = (TArr (TVar "a") (TVar "a"))
+  putStrLn $ "+ should succeed: -- () |- " ++ show factExp ++ " <= " ++ show ty
+  let v =  runPipelineMCheck factExp ty
+  putStr "\t"
+  shouldPass v
+
+  let e::ExpPs = (ELet "id" (ELam "x" (EVar "x"))
+                       (EApp (EVar "id") (EVar "id")))
+  putStrLn $ "+ should succeed: -- () |- " ++ show e
+  let v =  runPipelineMInfer e
+  putStr "\t"
+  shouldPass v
 
 

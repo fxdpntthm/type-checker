@@ -26,15 +26,22 @@ sub1 = Subt (Map.singleton "a" (TVar "b"))
 
 sub2 :: Substitution
 sub2 = Subt (Map.singleton "b" (TVar "c"))
-                     
+
+sub3 :: Substitution
+sub3 = Subt (Map.singleton "d" (TVar "e"))
+       
 factExp :: ExpPs
 factExp = EFix "fact" (ELam "n" (EIf (EApp (EVar "isZero") (EVar "n"))
                                      (ELit $ LitI 1)
-                                     (EApp (EApp (EVar "mult") (EVar "n")) (EApp (EVar "fact") (EApp (EVar "dec") (EVar "n"))))))
+                                     (EApp (EApp (EVar "mult") (EVar "n"))
+                                                 (EApp (EVar "fact")
+                                                       (EApp (EApp (EVar "-") (EVar "n")) (ELit $ LitI 1))))))
 factExpWrong :: ExpPs
 factExpWrong = EFix "fact" (ELam "n" (EIf (EApp (EVar "isZero") (EVar "n"))
                                      (ELit $ LitI 1)
-                                     (EApp (EApp (EVar "mult") (EVar "n")) (EApp (EVar "fact") (EApp (EVar "eq1") (EVar "n"))))))
+                                     (EApp (EApp (EVar "mult") (EVar "n"))
+                                                 (EApp (EVar "fact")
+                                                 (EApp (EApp (EVar "=") (EVar "n")) (ELit $ LitI 1))))))
 
 
 assert :: Bool -> IO ()

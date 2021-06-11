@@ -14,10 +14,10 @@ runPipelineW e = do (fe, _) <- runStateT (freshen e) initFnS
                     (te, _) <- runStateT (algoW globalCtx fe) initTcS
                     return $ tidyType (fst  te)
 
-runPipelineMCheck :: ExpPs -> Type -> Either String Substitution
+runPipelineMCheck :: ExpPs -> Type -> Either String Scheme
 runPipelineMCheck e ty = do (fe, _) <- runStateT (freshen e) initFnS
                             (s, _) <- runStateT (algoM globalCtx fe ty) initTcS
-                            return s
+                            return $ tidyType (substitute s ty)
                             
 
 runPipelineMInfer :: ExpPs -> Either String Scheme

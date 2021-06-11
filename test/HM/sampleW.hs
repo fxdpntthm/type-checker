@@ -18,6 +18,7 @@ import Common
 main :: IO ()
 main = do
   putStrLn $ show $ substitute sub1 sub2
+  putStrLn $ show $ substitute sub1 sub3
 
   putStr $ "+ should succeed: Bool ~ Bool\n\t"
   let v = (execStateT $ (unify (TConst TBool) (TConst TBool))) (TcState mempty 0)
@@ -36,7 +37,13 @@ main = do
                                (TArr (TVar "a") (TVar "b"))))
           (TcState mempty 0)
   shouldPass v
-  
+
+  putStr $ "+ should succeed: a -> b ~ c -> d\n\t"
+  let v = (execStateT $ (unify (TArr (TVar "a") (TVar "b"))
+                               (TArr (TVar "c") (TVar "d"))))
+          (TcState mempty 0)
+  shouldPass v
+
   putStr $ "+ should succeed: a ~ b -> c \n\t"
   let v = (execStateT $ (unify (TVar "a")
                                (TArr (TVar "b") (TVar "c"))))
@@ -44,55 +51,92 @@ main = do
   shouldPass v
   
   putStrLn $ "+ should fail:\n\t -- (y: Bool) |- x"
-  let v = (execStateT $ algoW (Context $ Map.singleton (unique 0 "y") (Forall (Set.fromList []) $ TConst TBool))
+  let v = (runStateT $ algoW (Context $ Map.singleton (unique 0 "y") (Forall (Set.fromList []) $ TConst TBool))
                       (EVar $ unique 0 "x")) initTcS
   shouldFail v
   
   putStrLn $ "+ should succeed:\n\t -- (x: Bool) |- x"
-  let v = (execStateT $ algoW (Context $ Map.singleton (unique 0 "x") (Forall (Set.fromList []) $ TConst TBool))
+  let v = (runStateT $ algoW (Context $ Map.singleton (unique 0 "x") (Forall (Set.fromList []) $ TConst TBool))
                       (EVar $ unique 0 "x")) initTcS
   shouldPass v
   
   putStrLn $ "+ should succeed:\n\t -- () |- \\x. Bool"
-  let v = (execStateT $ algoW mempty (ELam (unique 0 "x") (ELit $ LitB True))) initTcS
-  shouldPass v
-  
-  putStrLn $ "+ should succeed:\n\t -- () |- \\x. \\y. True"
-  let v = runPipelineW (ELam "x" (ELam "y" $ ELit $ LitB True))
-  shouldPass v
-  
-  putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x) (False)"
-  let v = runPipelineW (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
-  shouldPass v
-  
-  putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x)"
-  let v = runPipelineW (ELam "x" (EVar "x"))
-  shouldPass v
-  
-  putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x) (\\y. y)"
-  let v =  runPipelineW (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
+  let v = (runStateT $ algoW mempty (ELam (unique 0 "x") (ELit $ LitB True))) initTcS
   shouldPass v
 
-  putStrLn $ "+ should succeed:\n\t -- () |- (\\x. x) (\\y. y) True"
-  let v =  runPipelineW (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")) `EApp` (ELit $ LitB True))
+  putStrLn $ "+ should succeed:\n\t -- () |- \\x. Bool"
+  let v = runPipelineW (ELam "x" (ELit $ LitB True))
   shouldPass v
 
-  putStrLn $ "+ should fail:\n\t -- () |- ((\\x. x) (False))(\\x.x)"
-  let v = runPipelineW (EApp (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
+  let e::ExpPs = ELam "x" (ELam "y" $ ELit $ LitB True)
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
+  let v = runPipelineW e
+  shouldPass v
+  
+  let e::ExpPs = (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
+  let v = runPipelineW e
+  shouldPass v
+
+  let e::ExpPs = (ELam "x" (EVar "x"))
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
+  let v = runPipelineW e
+  shouldPass v
+
+  let e::ExpPs = (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")))
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
+  let v =  runPipelineW e
+  shouldPass v
+
+  let e::ExpPs = (EApp (ELam "x" (EVar "x")) (ELam "y" (EVar "y")) `EApp` (ELit $ LitB True))
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
+  let v =  runPipelineW e
+  shouldPass v
+
+  let e::ExpPs = (EApp (EApp (ELam "x" (EVar "x")) (ELit $ LitB False))
                                  (ELam "x" (EVar "x")))
+  putStrLn $ "+ should fail:\n\t -- () |- " ++ show e
+  let v = runPipelineW e
   shouldFail v
-    
-  putStrLn $ "+ should succeed:\n\t -- () |- let id = \\x.x in (id False)"
-  let v = runPipelineW (ELet "id" (ELam "x" (EVar "x"))
-                                 (EApp (EVar "id") (ELit $ LitB False)))
+
+  let e::ExpPs = (ELet "id" (ELam "x" (EVar "x"))
+                            (EApp (EVar "id") (ELit $ LitB False)))
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
+  let v = runPipelineW e
   shouldPass v
   
-  putStr $ "+ should succeed:\n\t -- letrec f = \\ x -> if x = 0 then 1 else x * (fact x-1) \n\t"
+  let e::ExpPs = (ELet "id" (ELam "x" (EVar "x"))
+                         (EApp (EVar "id") (EVar "id")))
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
+  let v =  runPipelineW e
+  shouldPass v
+
+  let e::ExpPs = (ELet "id" (ELam "x" (EVar "x")) (EIf (ELit $ LitB True) (ELit $ LitI 1) (EApp (EVar "id") (ELit $ LitI 1))))
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
+  let v =  runPipelineW e
+  shouldPass v
+
+  let e::ExpFn = (EApp (EVar isZero) (EVar $ mkUnique "n"))
+  putStrLn $ "+ should succeed:\n\t -- (n:Int) |- " ++ show e
+  let v = (runStateT $ algoW (updateContext globalCtx (mkUnique "n") (scheme (TConst TInt))) e) initTcS
+  shouldPass v
+
+  let e::ExpPs = ELam "n" (EApp (EVar "isZero") (EVar "n"))
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
+  let v = runPipelineW e
+  shouldPass v
+
+  let e::ExpPs = (EIf (ELit $ LitB True) (ELit $ LitI 1) (ELit $ LitB False))
+  putStrLn $ "+ should fail:\n\t -- () |- " ++ show e
+  let v =  runPipelineW e
+  shouldFail v
+
+  putStrLn $ "+ should fail:\n\t -- () |- " ++ show factExpWrong
+  let v =  runPipelineW factExpWrong
+  shouldFail v
+
+  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show factExp
   let v =  runPipelineW factExp
   shouldPass v
 
 
-  putStr $ "+ should succeed:\n\t -- (let id = \\x -> x in (id id))\n\t"
-  let v =  runPipelineW (ELet "id" (ELam "x" (EVar "x"))
-                         (EApp (EVar "id") (EVar "id")))
-  shouldPass v
