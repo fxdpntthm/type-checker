@@ -28,37 +28,10 @@ module HM.AlgorithmW where
 
 import HM.Language
 import HM.Util
+import HM.Unify
 
 import Control.Monad.State
-import Debug.Trace (traceM)
-
--- Unify is a function that tries to unify 2 types or returns an error
--- The goal will be to convert left Type into a right Type
--- so that substitute t1 (unify (ty1, ty2)) = ty2 if unify returns a Right _
--- we need to update the state i.e. subs tcm and return a ()
-unify :: Type ->  Type -> TCM ()
-unify t1@(TArr a b) t2@(TArr c d) = do unify a c
-                                       unify b d
-
-unify (TVar a) x@(TVar b)         | (a == b) = return ()
-                                  | otherwise =  do modify (\tcs -> tcs {subs = substitute (subs tcs) (sub a x)})
-unify x1@(TVar a) x          = do if (a `elem` fvs x)
-                                    then typeError $ infiniteType x1 x
-                                    else do modify (\tcs -> tcs {subs = substitute (subs tcs) (sub a x)})
-unify x x1@(TVar a)          = do if (a `elem` fvs x)
-                                    then typeError $ infiniteType x x1
-                                    else do modify (\tcs -> tcs {subs = substitute (subs tcs) (sub a x)})
-unify t1@(TConst a) t2@(TConst b) | (a == b)  = return ()
-                            | otherwise = typeError $ cannotUnify t1 t2
-unify t1@(TConst a)  b      = typeError $ cannotUnify t1 b
-
-unify a b                   = typeError $ cannotUnify a b
-
-infiniteType t1 t2 = "unification of "
-                     ++ show t1 ++ " and " ++ show t2
-                     ++ " will lead to infinite type"
-cannotUnify t1 t2 = "Cannot unify " ++ (show t1) ++ " and " ++ (show t2)
-
+import Debug.Trace (trace)
 
 
 -- Algorithm W should assign the most general type for the expression i.e.
@@ -135,15 +108,10 @@ algoW gamma (ELam x e) = do x' <- fresh 'x'                             -- x:T
   and then fire unify to ensure the complete expression is well typed
 -}
 algoW gamma (EApp fn arg) = do (fty, s)  <- algoW gamma fn                         -- Γ ⊢ e : T -> T'
-                               -- error (show fn ++ "::" ++ show fty)
                                (aty, s') <- algoW (substitute s gamma) arg         -- Γ ⊢ e' :T
-                               -- error (show arg ++ "::" ++ show aty)
                                rty <- fresh 'e'
-                               unify (TArr aty rty) fty
-                               s'' <- get
-                               let subst = subs s''
-                               -- error ((show subst) ++ show (substitute subst rty))
-                               return $ ((substitute subst rty), (substitute subst (substitute s' s)))
+                               s'' <- unify (substitute s' fty) (TArr aty rty) 
+                               return $ ((substitute s'' rty), (substitute s'' (substitute s' s)))
 
 
 {-
@@ -175,22 +143,30 @@ algoW gamma (ELet n e e') = do (ty, s) <- algoW gamma e                  -- Γ �
 
 
 -}
-algoW gamma (EIf c e1 e2) = do (ty, s) <- algoW gamma c                  -- Γ ⊢ c : T1
-                               (ty1, s1) <- algoW gamma e1               -- Γ ⊢ e1 : T2
-                               (ty2, s2) <- algoW gamma e2               -- Γ ⊢ e2 : T3
-                               unify ty1 ty2                             -- T2 = T3
-                               unify ty (TConst TBool)                   -- T1 = Bool
-                               return (ty1, s `mappend` s1 `mappend` s2)
+algoW gamma (EIf c e1 e2) = do (ty1, s1) <- algoW gamma e1                   -- Γ ⊢ e1 : T2
+                               (ty2, s2) <- algoW gamma e2                   -- Γ ⊢ e2 : T3
+                               s12 <- unify ty1 ty2                          -- T2 = T3
+                               let s = substitute s12 (substitute s2 s1)
+                               (b, s') <- algoW (substitute s gamma)  c        -- Γ ⊢ c : T1
+                               s''  <- unify b (TConst TBool)                  -- T1 = Bool
+                               let s''' =  substitute s'' (substitute s' s)
+                               return (substitute s''' ty1,  s''')
 
 
 
--- This is a mess
-algoW gamma (EFix f l@(ELam x e)) = do b <- fresh 'f'                                       -- f: T
+{-
+
+                 Γ, f: T -> T' ⊢ (λx. e) : T -> T'
+   -------------------------------------------------------- [Let]
+                 Γ ⊢ letrec f (λx. e) : T -> T'
+
+
+-}
+
+algoW gamma (EFix f l@(ELam _ _)) = do b <- fresh 'f'                                       -- f: T
                                        let gamma' = updateContext gamma f (scheme b)        -- Γ, f:T
-                                       (ty, s) <- algoW gamma' l                            -- Γ, f:b ⊢ l : T'
-                                       unify (substitute s b) ty
-                                       tcst <- get
-                                       let s' = subs tcst
-                                       return (ty, s')
+                                       (ty, s) <- algoW gamma' l                            -- Γ, f:T ⊢ l : T'
+                                       s' <- unify (substitute s b) ty
+                                       return (substitute s' ty, substitute s' s)
 
 algoW _ e  = typeError $ "Cannot infer type: " ++ show e

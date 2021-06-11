@@ -3,6 +3,7 @@ module Main where
 
 import HM.Language
 import HM.AlgorithmM
+import HM.Unify
 import HM.Util
 import HM.Freshen
 import HM.Driver

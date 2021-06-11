@@ -51,6 +51,7 @@ library
   -- Modules exported by the library.
   exposed-modules:     HM.Language
                      , HM.Util
+                     , HM.Unify
                      , HM.AlgorithmW
                      , HM.AlgorithmM
                      , HM.Freshen

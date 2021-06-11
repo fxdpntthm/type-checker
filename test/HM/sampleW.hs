@@ -4,6 +4,7 @@ module Main where
 
 import HM.Language
 import HM.AlgorithmW
+import HM.Unify
 import HM.Util
 import HM.Freshen
 import Control.Monad.State
@@ -64,8 +65,9 @@ main = do
   let v = (runStateT $ algoW mempty (ELam (unique 0 "x") (ELit $ LitB True))) initTcS
   shouldPass v
 
+  let e::ExpPs = (ELam "x" (ELit $ LitB True))
   putStrLn $ "+ should succeed:\n\t -- () |- \\x. Bool"
-  let v = runPipelineW (ELam "x" (ELit $ LitB True))
+  let v = runPipelineW e
   shouldPass v
 
   let e::ExpPs = ELam "x" (ELam "y" $ ELit $ LitB True)
@@ -111,10 +113,10 @@ main = do
   let v =  runPipelineW e
   shouldPass v
 
-  let e::ExpPs = (ELet "id" (ELam "x" (EVar "x")) (EIf (ELit $ LitB True) (ELit $ LitI 1) (EApp (EVar "id") (ELit $ LitI 1))))
-  putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
-  let v =  runPipelineW e
-  shouldPass v
+  -- let e::ExpPs = (ELet "id" (ELam "x" (EVar "x")) (EIf (ELit $ LitB True) (ELit $ LitI 1) (EApp (EVar "id") (ELit $ LitI 1))))
+  -- putStrLn $ "+ should succeed:\n\t -- () |- " ++ show e
+  -- let v =  runPipelineW e
+  -- shouldPass v
 
   let e::ExpFn = (EApp (EVar isZero) (EVar $ mkUnique "n"))
   putStrLn $ "+ should succeed:\n\t -- (n:Int) |- " ++ show e
@@ -126,10 +128,10 @@ main = do
   let v = runPipelineW e
   shouldPass v
 
-  let e::ExpPs = (EIf (ELit $ LitB True) (ELit $ LitI 1) (ELit $ LitB False))
-  putStrLn $ "+ should fail:\n\t -- () |- " ++ show e
-  let v =  runPipelineW e
-  shouldFail v
+  -- let e::ExpPs = (EIf (ELit $ LitB True) (ELit $ LitI 1) (ELit $ LitB False))
+  -- putStrLn $ "+ should fail:\n\t -- () |- " ++ show e
+  -- let v =  runPipelineW e
+  -- shouldFail v
 
   putStrLn $ "+ should fail:\n\t -- () |- " ++ show factExpWrong
   let v =  runPipelineW factExpWrong
