@@ -180,6 +180,12 @@ main = do
   putStr "\t"
   shouldPass v
 
+  let e::ExpPs = EFix "f" (ELam "x" (EApp (EVar "f") (EApp (EVar "f")( EVar "x"))))
+  putStrLn $ "+ should succeed: -- () |- " ++ show e
+  let v =  runPipelineMInfer e
+  putStr "\t"
+  shouldPass v
+
   let e::ExpPs = (ELet "id" (ELam "x" (EVar "x"))
                        (EApp (EVar "id") (EVar "id")))
   putStrLn $ "+ should succeed: -- () |- " ++ show e
