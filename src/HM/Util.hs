@@ -1,4 +1,3 @@
-{-# Language InstanceSigs #-}
 module HM.Util where
 
 import HM.Language
@@ -21,9 +20,9 @@ data FnState = FnS {
   , table :: Map String Unique -- maps current variables to their uniques
                    }
   deriving (Show)
-               
+
 incFnS :: FnState -> FnState
-incFnS (FnS {seed = s, table = t }) = FnS {seed = s + 1, table=t}
+incFnS FnS {seed = s, table = t } = FnS {seed = s + 1, table=t}
 
 type FnM a = StateT FnState (Either String) a
 
@@ -34,7 +33,7 @@ unique s n = Unique { value = n, hash = H.hash n, scope = s}
 -- Generates a fresh unique to be used in this scope
 -- Overwrites the existing if it already existed in the table
 freshUnique :: String -> FnM Unique
-freshUnique n = do (FnS {table = t, seed = s}) <- get
+freshUnique n = do FnS {table = t, seed = s} <- get
                    let u = unique s n
                    let s' = FnS {table = Map.insert n u t, seed = s+1}
                    put s'
@@ -78,7 +77,7 @@ typeError err = StateT (\_ ->  Left err)
 -- Looks up a variable and returns the scheme if it exists in the
 -- context
 lookupVar :: Context -> Unique -> TCM Scheme
-lookupVar (Context c) i = case (Map.lookup i c) of
+lookupVar (Context c) i = case Map.lookup i c of
   Just x -> return x
   Nothing -> typeError $ "Variable " ++ show i ++ " not in context"
 
@@ -106,12 +105,12 @@ generalize' gamma ty = Forall qs ty
 fresh :: Char -> TCM Type
 fresh c = do tcs <- get
              modify incTno
-             return $ TVar (c:'`': (suffixGen !! (tno tcs)))
+             return $ TVar (c:'`': (suffixGen !! tno tcs))
   where
-    suffixGen = liftA2 (\i -> \pre -> [pre] ++ show i)  [ (1::Int) .. ]  ['a' .. 'z']
+    suffixGen = liftA2 (\ i pre -> pre : show i)  [ (1::Int) .. ]  ['a' .. 'z']
 
 incTno :: TcState -> TcState
-incTno (TcState {subs = s, tno = t}) = TcState {subs = s, tno = t + 1}
+incTno TcState {subs = s, tno = t} = TcState {subs = s, tno = t + 1}
 
 initTcS = TcState { subs = mempty, tno = 0 }
 
@@ -119,11 +118,11 @@ initTcS = TcState { subs = mempty, tno = 0 }
 globalCtx = Context $ Map.fromList [ (isZero, scheme (TArr (TConst TInt) (TConst TBool)))
                                    , (mult, scheme (TArr (TConst TInt) (TArr (TConst TInt) (TConst TInt))))
                                    , (minus, scheme (TArr (TConst TInt) (TArr (TConst TInt) (TConst TInt))))
-                                   , (eq, Forall (Set.fromList ["a"]) ((TVar "a") `TArr` ((TVar "a") `TArr` (TConst TBool))))]
+                                   , (eq, Forall (Set.fromList ["a"]) (TVar "a" `TArr` (TVar "a" `TArr` TConst TBool)))]
 
 -- after the inference is done, we get a type, but we'd like to generalize that to a scheme
 tidyType :: Type -> Scheme
-tidyType = generalize' eCtx 
+tidyType = generalize' eCtx
 
 -- Typechecker state holds the substitutions that we would use
 -- in order to typecheck the term and a term number that will be used

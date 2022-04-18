@@ -1,6 +1,6 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+-- {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE InstanceSigs #-}
+-- {-# LANGUAGE InstanceSigs #-}
 
 module HM.AlgorithmW where
 
@@ -55,8 +55,8 @@ algoW :: Context -> ExpFn -> TCM (Type, Substitution)
 -}
 
 algoW gamma (ELit x) = do case x of
-                            LitB _ -> return $ (TConst TBool, mempty)
-                            LitI _ -> return $ (TConst TInt, mempty)
+                            LitB _ -> return (TConst TBool, mempty)
+                            LitI _ -> return (TConst TInt, mempty)
 
 {-
    The second rule is for the variable
@@ -111,7 +111,7 @@ algoW gamma (EApp fn arg) = do (fty, s)  <- algoW gamma fn                      
                                (aty, s') <- algoW (substitute s gamma) arg         -- Γ ⊢ e' :T
                                rty <- fresh 'e'
                                s'' <- unify (substitute s' fty) (TArr aty rty) 
-                               return $ ((substitute s'' rty), (substitute s'' (substitute s' s)))
+                               return (substitute s'' rty, substitute s'' (substitute s' s))
 
 
 {-

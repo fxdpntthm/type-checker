@@ -64,10 +64,10 @@ library
   -- other-extensions:
 
   -- Other library packages from which modules are imported.
-  build-depends:       base ^>= 4.13
-                     , containers ^>= 0.6
+  build-depends:       base >= 4.13 && < 5
+                     , containers ^>= 0.6 && < 1
                      , mtl >=2.2.1 && < 2.5
-                     , hashable ^>= 1.3
+                     , hashable >= 1.3 && < 2
 
   -- Directories containing source files.
   hs-source-dirs:      src
@@ -79,8 +79,8 @@ library
 Test-Suite algo-w-test
   Type:                exitcode-stdio-1.0
   Main-is:             HM/sampleW.hs
-  build-depends:       base ^>= 4.13
-                     , containers ^>= 0.6
+  build-depends:       base >= 4.13 && < 5
+                     , containers >= 0.6 && < 1
                      , mtl >=2.2.1 && < 2.5
                      , type-checker
 
@@ -91,8 +91,8 @@ Test-Suite algo-w-test
 Test-Suite algo-m-test
   Type:                exitcode-stdio-1.0
   Main-is:             HM/sampleM.hs
-  build-depends:       base ^>= 4.13
-                     , containers ^>= 0.6
+  build-depends:       base >= 4.13 && < 5
+                     , containers >= 0.6 && < 1
                      , mtl >=2.2.1 && < 2.5
                      , type-checker
 

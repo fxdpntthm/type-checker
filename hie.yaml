@@ -1,0 +1,8 @@
+cradle:
+  cabal:
+    - path: "./src"
+      component: "lib:type-checker"
+    - path: "./test/HM/sampleW.hs"
+      component: "test:algo-w-test"
+    - path: "./test/HM/sampleM.hs"
+      component: "test:algo-m-test"

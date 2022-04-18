@@ -1,7 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -18,25 +17,32 @@ import Data.Set (Set)
 
 type Id = String
 
-data Phase = Parsed     
-           | Freshened  
-           | Tc         
+data Phase = Parsed
+           | Freshened
+           | Tc
            deriving (Show, Eq, Ord)
 
 data Pass (p :: Phase)  -- What compiler pass are we in?
 type PsPass = Pass 'Parsed
 type FnPass = Pass 'Freshened
 type TcPass = Pass 'Tc
-  
+
+-- A program is a list of expressions bound to a variable
+data Program pass = EId pass :-> [Exp pass]
+
+type ProgPs = Program PsPass
+type ProgFn = Program FnPass
+type ProgTc = Program TcPass
+
 -- Simple expressions in our language based on lambda calculus
 data Exp pass =
     EVar (EId pass)                         -- "a", "b"
-  | ELit Lit                                -- T/F
-  | ELam (EId pass) (Exp pass)              -- \x. ..
-  | EApp (Exp pass) (Exp pass)              -- e e'
-  | ELet (EId pass) (Exp pass) (Exp pass)   -- Let x = e in e'
+  | ELit Lit                                -- T/F 1, 2, 3
+  | ELam (EId pass) (Exp pass)              -- \x. x
   | EFix (EId pass) (Exp pass)              -- letrec f \x. e
-  | EIf (Exp pass) (Exp pass) (Exp pass)
+  | EApp (Exp pass) (Exp pass)              -- e e'
+  | ELet (EId pass) (Exp pass) (Exp pass)   -- let x = e in e'
+  | EIf (Exp pass) (Exp pass) (Exp pass)    -- if a then b else c
 
 data Lit = LitB Bool                  -- Literals for Bool
          | LitI Int                   -- Literals for Integer
@@ -62,13 +68,13 @@ instance Show (EId (Pass p)) => Show (Exp (Pass p)) where
   show (ELet x e1 e2) = "let " ++ show x ++ " = " ++ show e1 ++ " in " ++ show e2
   show (EFix x e) = "letrec " ++ show x ++ " = " ++ show e
   show (EIf c e1 e2) = "if " ++ show c ++ " then " ++ show e1 ++ " else " ++ show e2
-  
+
 data Unique = Unique { value :: String, hash :: Int, scope :: Int }
 
 instance Eq Unique where
   u1 == u2 = hash u1 == hash u2
 instance Show Unique where
-  show (Unique {value = v}) = v
+  show Unique {value = v} = v
 instance Ord Unique where
   u1 <= u2 = hash u1 <= hash u2
 
@@ -76,7 +82,7 @@ data TUnique = TUnique { uq :: Unique, ty :: Type}
 instance Eq TUnique where
   u1 == u2 = hash (uq u1) == hash (uq u2)
 instance Show TUnique where
-  show (TUnique {uq = u, ty = t}) = show u ++ "::" ++ show t
+  show TUnique {uq = u, ty = t} = show u ++ "::" ++ show t
 instance Ord TUnique where
   u1 <= u2 = hash (uq u1) <= hash (uq u2)
 
@@ -157,12 +163,12 @@ instance Show Scheme where
                    then ""
                    else "\\-/ " ++ showList (Set.toList s) ++ ". "
           showList [] = ""
-          showList (x:[]) = x
+          showList [x] = x
           showList (x:xs) = x ++  ", " ++ showList xs
 
 
 scheme :: Type -> Scheme
-scheme t = Forall (Set.empty) t
+scheme = Forall Set.empty
 
 -- free type variables in a scheme are all the variables in the type
 -- that are not quantified
@@ -177,7 +183,7 @@ instance FreeVariables Scheme where
 instance Substitutable Scheme where
   substitute :: Substitution -> Scheme -> Scheme
   substitute (Subt s) sm@(Forall is ty) =
-    Forall is (substitute (Subt (s `Map.restrictKeys` (fvs sm))) ty)
+    Forall is (substitute (Subt (s `Map.restrictKeys` fvs sm)) ty)
 
 -- Q: How should we describe the substitution?
 -- A: Substitution is nothing but a map from id to a type.
@@ -198,10 +204,10 @@ itv s = Set.filter (\a -> Set.member a (f a)) bs
   where
     bs = supp s
     f = \b -> Set.insert b (fvs (substitute s (TVar b)))
-  
-  
+
+
 instance Show Substitution where
-  show (Subt m) = "Subst {" ++ (foldl (\a b -> b ++ ", " ++ a) "" elems) ++ "}"
+  show (Subt m) = "Subst {" ++ foldl (\a b -> b ++ ", " ++ a) "" elems ++ "}"
     where
     elems = fmap (\(i, t) -> "(" ++ i ++ " ~ " ++ show t ++ ")") (Map.toList m)
 
@@ -217,9 +223,9 @@ consistent s1@(Subt m1) s2@(Subt m2) = all (\v -> composable (Map.lookup v m1)  
           composable :: Maybe Type -> Maybe Type -> Bool
           composable (Just (TConst TInt)) (Just (TConst TBool)) = False
           composable (Just (TConst TBool)) (Just (TConst TInt)) = False
-          
+
           composable _  _ = True
-          
+
 -- This means subsitution is composable (if it is consistent obviously)
 -- if  a ~ b &&  b ~ c holds
 --  ==>  a ~ c holds
@@ -229,12 +235,12 @@ instance Substitutable Substitution where
   substitute :: Substitution -> Substitution -> Substitution
   substitute s@(Subt m) s'@(Subt m') =
     if consistent s s'
-    then Subt ((Map.restrictKeys m (ks Set.\\ ks')) `Map.union` fmap (substitute s) m')
-    else error $ "Substitution is not composable for:\n\t" ++ show s ++ "\n\t" ++ show s' 
+    then Subt (Map.restrictKeys m (ks Set.\\ ks') `Map.union` fmap (substitute s) m')
+    else error $ "Substitution is not composable for:\n\t" ++ show s ++ "\n\t" ++ show s'
     where ks = supp s
           ks' = supp s'
-        
-data UnifyError = UnificationFailed String
+
+newtype UnifyError = UnificationFailed String
   deriving (Show, Eq)
 
 -- Gamma, context that contains all the typing judgements
@@ -257,7 +263,7 @@ instance FreeVariables Context where
 -- Substitute all the free variables in the context using the substitution
 instance Substitutable Context where
   substitute :: Substitution -> Context -> Context
-  substitute s (Context c) = Context ((substitute s) <$> c)
+  substitute s (Context c) = Context (substitute s <$> c)
 
 -- extend the context by adding an (id, scheme) pair
 updateContext :: Context -> Unique -> Scheme -> Context
